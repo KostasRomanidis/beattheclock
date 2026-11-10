@@ -45,9 +45,9 @@
 
 ## 8. End-to-end check
 
-- [ ] 8.1 Run each of the eight workout types once on Mac and iPad with short settings, and verify each behaves as its specs describe
-- [ ] 8.2 Do a real workout using the 8 x 0:45/0:15 Intervals setup, verify it is readable and audible from across the room, and tune colours and tones in place if needed
-- [ ] 8.3 Add a short `README.md` covering how to build, run and test, and verify the documented commands run as written
+- [x] 8.1 Run each of the eight workout types once on Mac and iPad with short settings, and verify each behaves as its specs describe
+- [x] 8.2 Do a real workout using the 8 x 0:45/0:15 Intervals setup, verify it is readable and audible from across the room, and tune colours and tones in place if needed
+- [x] 8.3 Add a short `README.md` covering how to build, run and test, and verify the documented commands run as written
 
 ## Workflow follow-up
 
