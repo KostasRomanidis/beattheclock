@@ -21,8 +21,8 @@ extension WorkoutConfiguration {
             Self.countdown(duration)
         case .amrap(let block, let blocks, let rest, _):
             Self.intervals(work: block, rest: rest, rounds: blocks)
-        case .emom(let window, let rounds):
-            Self.intervals(work: window, rest: .zero, rounds: rounds)
+        case .emom(let window, let exercises, let rounds, let rest):
+            Self.emom(window: window, exercises: exercises, rounds: rounds, rest: rest)
         case .tabata(let rounds):
             Self.intervals(work: Self.tabataWork, rest: Self.tabataRest, rounds: rounds)
         case .intervals(let work, let rest, let rounds):
@@ -52,6 +52,19 @@ extension WorkoutConfiguration {
 
     private static func intervals(work: Duration, rest: Duration, rounds: Int) -> [Segment] {
         alternating(Segment(kind: .work, ending: .afterDuration(work)), rest: rest, count: rounds)
+    }
+
+    /// Rounds of back-to-back windows. A stored rest is ignored with one exercise,
+    /// so a single-exercise EMOM never turns into intervals.
+    private static func emom(window: Duration, exercises: Int, rounds: Int, rest: Duration) -> [Segment] {
+        let windows = Array(repeating: Segment(kind: .work, ending: .afterDuration(window)), count: exercises)
+        let restSegment = Segment(kind: .rest, ending: .afterDuration(rest))
+        var segments: [Segment] = []
+        for round in 0..<rounds {
+            if round > 0 && exercises > 1 && rest > .zero { segments.append(restSegment) }
+            segments += windows
+        }
+        return segments
     }
 
     private static func countUp(cap: Duration?) -> [Segment] {

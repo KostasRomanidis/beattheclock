@@ -19,7 +19,8 @@ public enum SetupLimits {
     public static let workPresets: [Duration] = [20, 30, 40, 45, 60, 120].map { .seconds($0) }
     public static let restPresets: [Duration] = [0, 10, 15, 20, 30, 60].map { .seconds($0) }
     public static let longRestPresets: [Duration] = [30, 60, 90, 120, 180].map { .seconds($0) }
-    public static let roundPresets = [4, 5, 8, 10, 12, 20]
+    public static let roundPresets = [3, 5, 8, 10, 12, 20]
+    public static let exercisePresets = [1, 2, 3, 4, 5, 6]
     public static let blockPresets = [1, 2, 3, 4, 5]
     public static let setPresets = [3, 4, 5, 6, 8, 10]
 

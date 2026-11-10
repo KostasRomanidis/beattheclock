@@ -96,6 +96,10 @@ public struct SessionDisplay: Equatable, Sendable {
         let workSegments = session.segments.filter { $0.kind == .work }.count
         let workSoFar = session.segments[..<session.segmentIndex].filter { $0.kind == .work }.count
         let next = session.currentSegment.kind == .work ? "" : " next"
+        if let exercises = configuration.emomExercises {
+            let round = "\(unit) \(workSoFar / exercises + 1) of \(workSegments / exercises)"
+            return next.isEmpty ? "\(round), exercise \(workSoFar % exercises + 1) of \(exercises)" : round + next
+        }
         let place = "\(unit) \(workSoFar + 1) of \(workSegments)\(next)"
         return rounds.map { "\(place) · \($0)" } ?? place
     }
@@ -108,10 +112,16 @@ public struct SessionDisplay: Equatable, Sendable {
 
     private static func nextPhase(_ session: Session) -> String? {
         let nextIndex = session.segmentIndex + 1
+        let exercises = session.configuration.emomExercises
         guard nextIndex < session.segments.count else {
+            if exercises != nil { return "Last exercise" }
             return session.configuration.roundUnit.map { "Last \($0.lowercased())" }
         }
         let next = session.segments[nextIndex]
+        if let exercises, next.kind == .work, let duration = next.countdownDuration {
+            let exercise = session.segments[..<nextIndex].filter { $0.kind == .work }.count % exercises + 1
+            return "Exercise \(exercise) \(format(duration))"
+        }
         return next.countdownDuration.map { "\(next.kind.name) \(format($0))" } ?? next.kind.name
     }
 
@@ -137,6 +147,12 @@ extension WorkoutConfiguration {
     public var countsRounds: Bool {
         guard case .amrap(_, _, _, true) = self else { return false }
         return true
+    }
+
+    /// Exercises per EMOM round, when there is more than one to show within a round.
+    var emomExercises: Int? {
+        guard case .emom(_, let exercises, _, _) = self, exercises > 1 else { return nil }
+        return exercises
     }
 
     /// The name for one repeat of the workout, for workouts that have several.

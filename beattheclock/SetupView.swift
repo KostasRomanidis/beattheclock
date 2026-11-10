@@ -58,11 +58,21 @@ struct SetupView: View {
                 configuration = .amrap(block: block, blocks: blocks, rest: rest, countsRounds: $0)
             }))
 
-        case .emom(let window, let rounds):
-            DurationStepper("Every", value: Binding(get: { window }, set: { configuration = .emom(window: $0, rounds: rounds) }),
-                            presets: SetupLimits.windowPresets)
-            CountStepper("Rounds", value: Binding(get: { rounds }, set: { configuration = .emom(window: window, rounds: $0) }),
-                         presets: SetupLimits.roundPresets)
+        case .emom(let window, let exercises, let rounds, let rest):
+            DurationStepper("Every", value: Binding(get: { window }, set: {
+                configuration = .emom(window: $0, exercises: exercises, rounds: rounds, rest: rest)
+            }), presets: SetupLimits.windowPresets)
+            CountStepper("Exercises", value: Binding(get: { exercises }, set: {
+                configuration = .emom(window: window, exercises: $0, rounds: rounds, rest: rest)
+            }), presets: SetupLimits.exercisePresets)
+            CountStepper("Rounds", value: Binding(get: { rounds }, set: {
+                configuration = .emom(window: window, exercises: exercises, rounds: $0, rest: rest)
+            }), presets: SetupLimits.roundPresets)
+            if exercises > 1 {
+                DurationStepper("Rest", value: Binding(get: { rest }, set: {
+                    configuration = .emom(window: window, exercises: exercises, rounds: rounds, rest: $0)
+                }), minimum: SetupLimits.minimumRest, presets: SetupLimits.longRestPresets)
+            }
 
         case .tabata(let rounds):
             LabeledContent("Work", value: SessionDisplay.format(WorkoutConfiguration.tabataWork))
@@ -200,8 +210,14 @@ extension WorkoutConfiguration {
                 "\(Self.count(blocks, "block")) of \(Self.format(block)) with \(Self.format(rest)) rest between, \(total) in total."
             }
             return countsRounds ? plan + " Count each round as you go." : plan
-        case .emom(let window, let rounds):
-            return "A new round starts every \(Self.format(window)) for \(Self.count(rounds, "round")), \(total) in total."
+        case .emom(let window, let exercises, let rounds, let rest):
+            guard exercises > 1 else {
+                return "A new round starts every \(Self.format(window)) for \(Self.count(rounds, "round")), \(total) in total."
+            }
+            let plan = "\(Self.count(rounds, "round")) of \(exercises) exercises, a new one every \(Self.format(window))"
+            if rounds == 1 { return "\(plan). \(total) in total." }
+            if rest == .zero { return "\(plan) with no rest. \(total) in total." }
+            return "\(plan), with \(Self.format(rest)) rest between rounds. \(total) in total."
         case .tabata(let rounds):
             return Self.intervals(work: Self.tabataWork, rest: Self.tabataRest, rounds: rounds, total: total)
         case .intervals(let work, let rest, let rounds):

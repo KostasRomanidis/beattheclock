@@ -19,6 +19,8 @@ private func display(_ session: inout Session, at seconds: Double) -> SessionDis
 
 private let intervals = WorkoutConfiguration.intervals(work: .seconds(45), rest: .seconds(15), rounds: 8)
 private let sets = WorkoutConfiguration.sets(rest: .seconds(90), sets: 5)
+// Rounds start at 0, 6:00 and 12:00, with rests at 5:00 and 11:00.
+private let circuit = WorkoutConfiguration.emom(window: .seconds(60), exercises: 5, rounds: 3, rest: .seconds(60))
 
 @Suite struct TimeFormat {
     @Test func underAnHourShowsMinutesAndSeconds() {
@@ -82,7 +84,7 @@ private let sets = WorkoutConfiguration.sets(rest: .seconds(90), sets: 5)
 
     @Test func tabataAndEmomShowTotalLeft() {
         var tabata = session(.tabata(rounds: 8))
-        var emom = session(.emom(window: .seconds(60), rounds: 10))
+        var emom = session(.emom(window: .seconds(60), exercises: 1, rounds: 10, rest: .seconds(60)))
 
         #expect(display(&tabata, at: 0).secondaryTotal == "3:50 left")
         #expect(display(&emom, at: 90).secondaryTotal == "8:30 left")
@@ -124,6 +126,24 @@ private let sets = WorkoutConfiguration.sets(rest: .seconds(90), sets: 5)
         var workout = session(intervals)
 
         #expect(display(&workout, at: 128).position == "Round 3 of 8")
+    }
+
+    @Test func emomShowsTheExerciseWithinTheRound() {
+        var workout = session(circuit)
+
+        #expect(display(&workout, at: 570).position == "Round 2 of 3, exercise 4 of 5")
+    }
+
+    @Test func emomRestShowsTheNextRound() {
+        var workout = session(circuit)
+
+        #expect(display(&workout, at: 690).position == "Round 3 of 3 next")
+    }
+
+    @Test func singleExerciseEmomShowsOnlyTheRound() {
+        var workout = session(.emom(window: .seconds(60), exercises: 1, rounds: 10, rest: .seconds(60)))
+
+        #expect(display(&workout, at: 210).position == "Round 4 of 10")
     }
 
     @Test func setsRestShowsTheNextSet() {
@@ -183,6 +203,24 @@ private let sets = WorkoutConfiguration.sets(rest: .seconds(90), sets: 5)
         var workout = session(intervals, getReady: 10)
 
         #expect(display(&workout, at: 1).nextPhase == "Work 0:45")
+    }
+
+    @Test func emomNamesTheNextExercise() {
+        var workout = session(circuit)
+
+        #expect(display(&workout, at: 570).nextPhase == "Exercise 5 1:00")
+    }
+
+    @Test func emomRoundEndsWithRest() {
+        var workout = session(circuit)
+
+        #expect(display(&workout, at: 630).nextPhase == "Rest 1:00")
+    }
+
+    @Test func theLastEmomExerciseSaysSo() {
+        var workout = session(circuit)
+
+        #expect(display(&workout, at: 990).nextPhase == "Last exercise")
     }
 
     @Test func theLastWorkPhaseSaysSo() {
@@ -251,13 +289,13 @@ private let sets = WorkoutConfiguration.sets(rest: .seconds(90), sets: 5)
     }
 
     @Test func halfwayThroughAWorkoutFillsHalfTheBar() {
-        var workout = session(.emom(window: .seconds(60), rounds: 10))
+        var workout = session(.emom(window: .seconds(60), exercises: 1, rounds: 10, rest: .seconds(60)))
 
         #expect(display(&workout, at: 300).workoutProgress == 0.5)
     }
 
     @Test func getReadyLeavesTheWorkoutBarEmpty() {
-        var workout = session(.emom(window: .seconds(60), rounds: 10), getReady: 10)
+        var workout = session(.emom(window: .seconds(60), exercises: 1, rounds: 10, rest: .seconds(60)), getReady: 10)
 
         #expect(display(&workout, at: 5).workoutProgress == 0)
     }

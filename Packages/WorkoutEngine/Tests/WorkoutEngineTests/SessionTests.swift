@@ -96,7 +96,7 @@ private let sets = WorkoutConfiguration.sets(rest: .seconds(90), sets: 3)
     }
 
     @Test func fortyMinuteWorkoutEndsExactlyOnTime() {
-        var workout = session(.emom(window: .seconds(60), rounds: 40))
+        var workout = session(.emom(window: .seconds(60), exercises: 1, rounds: 40, rest: .seconds(60)))
 
         _ = run(&workout, from: 0, to: 2399.9)
         #expect(workout.status == .running)
@@ -385,6 +385,14 @@ private let sets = WorkoutConfiguration.sets(rest: .seconds(90), sets: 3)
         let cues = run(&workout, from: 0, to: 16).map(\.1).filter { $0 != .tick }
 
         #expect(cues == [.workStart, .restStart, .workStart, .finish])
+    }
+
+    @Test func eachEmomExercisePlaysTheWorkSoundAndRoundsRest() {
+        var workout = session(.emom(window: .seconds(5), exercises: 2, rounds: 2, rest: .seconds(5)))
+
+        let cues = run(&workout, from: 0, to: 26).map(\.1).filter { $0 != .tick }
+
+        #expect(cues == [.workStart, .workStart, .restStart, .workStart, .workStart, .finish])
     }
 
     @Test func aSetStartingAfterRestPlaysTheWorkSound() {

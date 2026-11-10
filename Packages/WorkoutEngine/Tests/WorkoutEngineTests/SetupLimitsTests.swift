@@ -50,7 +50,7 @@ import Testing
         #expect(durations.allSatisfy { $0 >= SetupLimits.minimumDuration && $0 <= SetupLimits.maximumDuration })
         let rests = SetupLimits.restPresets + SetupLimits.longRestPresets
         #expect(rests.allSatisfy { $0 >= SetupLimits.minimumRest && $0 <= SetupLimits.maximumDuration })
-        let counts = SetupLimits.roundPresets + SetupLimits.blockPresets + SetupLimits.setPresets
+        let counts = SetupLimits.roundPresets + SetupLimits.exercisePresets + SetupLimits.blockPresets + SetupLimits.setPresets
         #expect(counts.allSatisfy(SetupLimits.counts.contains))
     }
 
@@ -63,9 +63,11 @@ import Testing
                 #expect(SetupLimits.durationPresets.contains(block))
                 #expect(SetupLimits.blockPresets.contains(blocks))
                 #expect(SetupLimits.longRestPresets.contains(rest))
-            case .emom(let window, let rounds):
+            case .emom(let window, let exercises, let rounds, let rest):
                 #expect(SetupLimits.windowPresets.contains(window))
+                #expect(SetupLimits.exercisePresets.contains(exercises))
                 #expect(SetupLimits.roundPresets.contains(rounds))
+                #expect(SetupLimits.longRestPresets.contains(rest))
             case .tabata(let rounds):
                 #expect(SetupLimits.roundPresets.contains(rounds))
             case .intervals(let work, let rest, let rounds):

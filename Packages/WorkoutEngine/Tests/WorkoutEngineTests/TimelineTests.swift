@@ -28,7 +28,28 @@ private let set = Segment(kind: .work, ending: .byUser(cap: nil))
     }
 
     @Test func emomWindowsRunBackToBack() {
-        let timeline = WorkoutConfiguration.emom(window: .seconds(60), rounds: 10).timeline()
+        let timeline = WorkoutConfiguration.emom(window: .seconds(60), exercises: 1, rounds: 10, rest: .seconds(60)).timeline()
+
+        #expect(timeline == Array(repeating: work(60), count: 10))
+    }
+
+    @Test func emomRestsBetweenRoundsOfExercises() {
+        let timeline = WorkoutConfiguration.emom(window: .seconds(60), exercises: 5, rounds: 3, rest: .seconds(60)).timeline()
+        let round = Array(repeating: work(60), count: 5)
+
+        #expect(timeline == round + [rest(60)] + round + [rest(60)] + round)
+        #expect(timeline.count == 17)
+        #expect(WorkoutConfiguration.emom(window: .seconds(60), exercises: 5, rounds: 3, rest: .seconds(60)).total == .seconds(17 * 60))
+    }
+
+    @Test func emomRoundsWithNoRestRunBackToBack() {
+        let timeline = WorkoutConfiguration.emom(window: .seconds(60), exercises: 5, rounds: 3, rest: .zero).timeline()
+
+        #expect(timeline == Array(repeating: work(60), count: 15))
+    }
+
+    @Test func singleExerciseEmomIgnoresItsStoredRest() {
+        let timeline = WorkoutConfiguration.emom(window: .seconds(60), exercises: 1, rounds: 10, rest: .seconds(60)).timeline()
 
         #expect(timeline == Array(repeating: work(60), count: 10))
     }
