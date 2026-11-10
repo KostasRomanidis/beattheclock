@@ -43,3 +43,43 @@ import Testing
         #expect(SetupLimits.defaultGetReady == .seconds(10))
     }
 }
+
+@Suite struct SetupPresets {
+    @Test func presetsStayWithinLimits() {
+        let durations = SetupLimits.durationPresets + SetupLimits.capPresets + SetupLimits.windowPresets + SetupLimits.workPresets
+        #expect(durations.allSatisfy { $0 >= SetupLimits.minimumDuration && $0 <= SetupLimits.maximumDuration })
+        let rests = SetupLimits.restPresets + SetupLimits.longRestPresets
+        #expect(rests.allSatisfy { $0 >= SetupLimits.minimumRest && $0 <= SetupLimits.maximumDuration })
+        let counts = SetupLimits.roundPresets + SetupLimits.blockPresets + SetupLimits.setPresets
+        #expect(counts.allSatisfy(SetupLimits.counts.contains))
+    }
+
+    @Test func everyDefaultIsAPreset() {
+        for configuration in WorkoutConfiguration.defaults {
+            switch configuration {
+            case .timer(let duration):
+                #expect(SetupLimits.durationPresets.contains(duration))
+            case .amrap(let block, let blocks, let rest, _):
+                #expect(SetupLimits.durationPresets.contains(block))
+                #expect(SetupLimits.blockPresets.contains(blocks))
+                #expect(SetupLimits.longRestPresets.contains(rest))
+            case .emom(let window, let rounds):
+                #expect(SetupLimits.windowPresets.contains(window))
+                #expect(SetupLimits.roundPresets.contains(rounds))
+            case .tabata(let rounds):
+                #expect(SetupLimits.roundPresets.contains(rounds))
+            case .intervals(let work, let rest, let rounds):
+                #expect(SetupLimits.workPresets.contains(work))
+                #expect(SetupLimits.restPresets.contains(rest))
+                #expect(SetupLimits.roundPresets.contains(rounds))
+            case .forTime:
+                #expect(SetupLimits.capPresets.contains(SetupLimits.defaultCap))
+            case .stopwatch:
+                break
+            case .sets(let rest, let sets):
+                #expect(SetupLimits.longRestPresets.contains(rest))
+                #expect(SetupLimits.setPresets.contains(sets))
+            }
+        }
+    }
+}
