@@ -13,10 +13,10 @@
 
 ## 3. Engine: session behaviour
 
-- [ ] 3.1 Add `Session` start, get-ready and time-driven phase advance using supplied time, and verify tests cover ordering, get-ready skip, get-ready off, several boundaries in one update, and a simulated 40-minute run ending exactly on time
-- [ ] 3.2 Add pause, resume and end workout, and verify tests confirm phase and total times are unchanged by a pause, and that tap and space skip the get-ready instead of pausing it
-- [ ] 3.3 Add main actions for AMRAP round counting with undo, For Time splits, and Sets set-done, plus Finish and the For Time cap, and verify tests cover the spec's scenarios, including split times of 2:10 and 2:20 and the last set ending the workout
-- [ ] 3.4 Add cue events from `update`, and verify tests cover exact-once ticks at 3, 2 and 1, phase sounds, finish, ticks across a pause, skipped get-ready ticks, and dropping events after a stall of over one second
+- [x] 3.1 Add `Session` start, get-ready and time-driven phase advance using supplied time, and verify tests cover ordering, get-ready skip, get-ready off, several boundaries in one update, and a simulated 40-minute run ending exactly on time
+- [x] 3.2 Add pause, resume and end workout, and verify tests confirm phase and total times are unchanged by a pause, and that tap and space skip the get-ready instead of pausing it
+- [x] 3.3 Add main actions for AMRAP round counting with undo, For Time splits, and Sets set-done, plus Finish and the For Time cap, and verify tests cover the spec's scenarios, including split times of 2:10 and 2:20 and the last set ending the workout
+- [x] 3.4 Add cue events from `update`, and verify tests cover exact-once ticks at 3, 2 and 1, phase sounds, finish, ticks across a pause, skipped get-ready ticks, and dropping events after a stall of over one second
 
 ## 4. Engine: display content
 
