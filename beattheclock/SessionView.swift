@@ -5,6 +5,7 @@ import WorkoutEngine
 struct SessionView: View {
     let controller: SessionController
     let onExit: () -> Void
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         Group {
@@ -15,6 +16,13 @@ struct SessionView: View {
             }
         }
         .task { await controller.run() }
+        #if os(iOS)
+        // The iPad cannot keep time in the background, so pause on leaving the foreground.
+        // The Mac keeps running when covered or inactive.
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active { controller.perform { $0.pause($1) } }
+        }
+        #endif
     }
 }
 

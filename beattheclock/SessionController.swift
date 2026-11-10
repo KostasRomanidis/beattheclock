@@ -10,13 +10,16 @@ final class SessionController {
     private(set) var session: Session
     private(set) var display: SessionDisplay
     private let getReady: Duration
+    private let cuePlayer: CuePlayer
+    private let wake = DisplayWake()
 
-    init(configuration: WorkoutConfiguration, getReady: Duration) {
+    init(configuration: WorkoutConfiguration, getReady: Duration, cuePlayer: CuePlayer) {
         let now = ContinuousClock.now
         let session = Session(configuration: configuration, getReady: getReady, startingAt: now)
         self.session = session
         self.display = SessionDisplay(session: session, now: now)
         self.getReady = getReady
+        self.cuePlayer = cuePlayer
     }
 
     /// Runs while the live view is showing; SwiftUI cancels it when the view goes away.
@@ -43,7 +46,8 @@ final class SessionController {
         let now = ContinuousClock.now
         let cues = session.update(now)
         display = SessionDisplay(session: session, now: now)
-        // shortcut: cues are dropped until CuePlayer exists, replace in task 7.1.
-        _ = cues
+        cues.forEach(cuePlayer.play)
+        // Awake while running or paused; normal sleep returns once the summary shows.
+        wake.isActive = session.status != .finished
     }
 }

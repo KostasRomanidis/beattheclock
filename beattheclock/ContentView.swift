@@ -15,6 +15,7 @@ struct ContentView: View {
     @State private var getReady = SetupLimits.defaultGetReady
     @State private var path: [Int] = []
     @State private var controller: SessionController?
+    @State private var cuePlayer = CuePlayer()
 
     var body: some View {
         if let controller {
@@ -43,7 +44,7 @@ struct ContentView: View {
             .navigationTitle("Beat the Clock")
             .navigationDestination(for: Int.self) { index in
                 SetupView(configuration: $configurations[index], getReady: $getReady) {
-                    controller = SessionController(configuration: configurations[index], getReady: getReady)
+                    controller = SessionController(configuration: configurations[index], getReady: getReady, cuePlayer: cuePlayer)
                 }
             }
         }

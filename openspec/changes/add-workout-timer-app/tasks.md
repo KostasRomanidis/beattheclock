@@ -39,9 +39,9 @@
 
 ## 7. App: system integration
 
-- [ ] 7.1 Add `CuePlayer` with generated tones and iPad audio session setup, and verify by running that each cue sounds distinct, that music keeps playing, and that cues play with the iPad's silent setting on
-- [ ] 7.2 Add `DisplayWake` for both platforms, and verify the screen stays on beyond its sleep time, including while paused, and sleeps normally after the workout ends
-- [ ] 7.3 Add iPad auto-pause on leaving the foreground, and verify the workout is paused on return; on Mac, verify phases and cues stay on time with the window covered for several minutes
+- [x] 7.1 Add `CuePlayer` with generated tones and iPad audio session setup, and verify by running that each cue sounds distinct, that music keeps playing, and that cues play with the iPad's silent setting on
+- [x] 7.2 Add `DisplayWake` for both platforms, and verify the screen stays on beyond its sleep time, including while paused, and sleeps normally after the workout ends
+- [x] 7.3 Add iPad auto-pause on leaving the foreground, and verify the workout is paused on return; on Mac, verify phases and cues stay on time with the window covered for several minutes
 
 ## 8. End-to-end check
 
