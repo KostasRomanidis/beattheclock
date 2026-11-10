@@ -1,0 +1,273 @@
+import Testing
+@testable import WorkoutEngine
+
+private let start = ContinuousClock.now
+
+private func at(_ seconds: Double) -> Session.Instant {
+    start + .milliseconds(Int((seconds * 1000).rounded()))
+}
+
+private func session(_ configuration: WorkoutConfiguration, getReady: Int = 0) -> Session {
+    Session(configuration: configuration, getReady: .seconds(getReady), startingAt: start)
+}
+
+/// The display after updating the session to `seconds`.
+private func display(_ session: inout Session, at seconds: Double) -> SessionDisplay {
+    _ = session.update(at(seconds))
+    return SessionDisplay(session: session, now: at(seconds))
+}
+
+private let intervals = WorkoutConfiguration.intervals(work: .seconds(45), rest: .seconds(15), rounds: 8)
+private let sets = WorkoutConfiguration.sets(rest: .seconds(90), sets: 5)
+
+@Suite struct TimeFormat {
+    @Test func underAnHourShowsMinutesAndSeconds() {
+        #expect(SessionDisplay.format(.seconds(45)) == "0:45")
+        #expect(SessionDisplay.format(.seconds(12 * 60)) == "12:00")
+    }
+
+    @Test func overAnHourAddsHours() {
+        #expect(SessionDisplay.format(.seconds(3600 + 2 * 60 + 5)) == "1:02:05")
+    }
+
+    @Test func countdownShowsTheLastSecondAsOne() {
+        #expect(SessionDisplay.format(.milliseconds(400), roundingUp: true) == "0:01")
+        #expect(SessionDisplay.format(.zero, roundingUp: true) == "0:00")
+    }
+
+    @Test func elapsedTimeRoundsDown() {
+        #expect(SessionDisplay.format(.milliseconds(59_900)) == "0:59")
+    }
+}
+
+@Suite struct MainNumber {
+    @Test func intervalsShowTimeLeftInThePhase() {
+        var workout = session(intervals)
+
+        #expect(display(&workout, at: 8).mainTime == "0:37")
+    }
+
+    @Test func forTimeShowsTimeSoFar() {
+        var workout = session(.forTime(cap: nil))
+
+        #expect(display(&workout, at: 270).mainTime == "4:30")
+    }
+
+    @Test func setsShowTimeSoFarInASetAndTimeLeftInRest() {
+        var workout = session(sets)
+        #expect(display(&workout, at: 25).mainTime == "0:25")
+
+        workout.mainAction(at(30))
+
+        #expect(display(&workout, at: 50).mainTime == "1:10")
+    }
+
+    @Test func getReadyShowsItsCountdown() {
+        var workout = session(intervals, getReady: 10)
+
+        #expect(display(&workout, at: 0.5).mainTime == "0:10")
+    }
+}
+
+@Suite struct SecondaryTotal {
+    @Test func intervalsShowTotalLeft() {
+        // Round 3 work starts at 2:00, so 0:37 is left at 2:08.
+        var workout = session(intervals)
+
+        let screen = display(&workout, at: 128)
+
+        #expect(screen.mainTime == "0:37")
+        #expect(screen.secondaryTotal == "5:37 left")
+    }
+
+    @Test func tabataAndEmomShowTotalLeft() {
+        var tabata = session(.tabata(rounds: 8))
+        var emom = session(.emom(window: .seconds(60), rounds: 10))
+
+        #expect(display(&tabata, at: 0).secondaryTotal == "3:50 left")
+        #expect(display(&emom, at: 90).secondaryTotal == "8:30 left")
+    }
+
+    @Test func amrapShowsTotalLeftOnlyWithSeveralBlocks() {
+        var single = session(.amrap(block: .seconds(720), blocks: 1, rest: .seconds(60), countsRounds: true))
+        var blocks = session(.amrap(block: .seconds(300), blocks: 3, rest: .seconds(60), countsRounds: true))
+
+        #expect(display(&single, at: 0).secondaryTotal == nil)
+        #expect(display(&blocks, at: 0).secondaryTotal == "17:00 left")
+    }
+
+    @Test func forTimeShowsCapLeftOnlyWithACap() {
+        var capped = session(.forTime(cap: .seconds(20 * 60)))
+        var uncapped = session(.forTime(cap: nil))
+
+        #expect(display(&capped, at: 270).secondaryTotal == "15:30 left")
+        #expect(display(&uncapped, at: 270).secondaryTotal == nil)
+    }
+
+    @Test func setsShowTotalElapsed() {
+        var workout = session(sets)
+
+        #expect(display(&workout, at: 720).secondaryTotal == "12:00 elapsed")
+    }
+
+    @Test func timerAndStopwatchShowNoTotal() {
+        var timer = session(.timer(duration: .seconds(300)))
+        var stopwatch = session(.stopwatch)
+
+        #expect(display(&timer, at: 10).secondaryTotal == nil)
+        #expect(display(&stopwatch, at: 10).secondaryTotal == nil)
+    }
+}
+
+@Suite struct Position {
+    @Test func intervalsShowTheRound() {
+        var workout = session(intervals)
+
+        #expect(display(&workout, at: 128).position == "Round 3 of 8")
+    }
+
+    @Test func setsRestShowsTheNextSet() {
+        var workout = session(sets)
+        workout.mainAction(at(30))
+        _ = workout.update(at(150))
+        workout.mainAction(at(160))
+
+        #expect(display(&workout, at: 170).position == "Set 3 of 5 next")
+    }
+
+    @Test func amrapShowsBlockAndRoundsCounted() {
+        var blocks = session(.amrap(block: .seconds(300), blocks: 3, rest: .seconds(60), countsRounds: true))
+        var single = session(.amrap(block: .seconds(720), blocks: 1, rest: .seconds(60), countsRounds: true))
+        single.tap(at(30))
+
+        #expect(display(&blocks, at: 10).position == "Block 1 of 3 · 0 rounds")
+        #expect(display(&single, at: 40).position == "1 round")
+    }
+
+    @Test func amrapWithoutCountingShowsOnlyTheBlock() {
+        var single = session(.amrap(block: .seconds(720), blocks: 1, rest: .seconds(60), countsRounds: false))
+
+        #expect(display(&single, at: 10).position == nil)
+    }
+
+    @Test func forTimeShowsTheRoundNumber() {
+        var workout = session(.forTime(cap: nil))
+        workout.tap(at(130))
+
+        #expect(display(&workout, at: 140).position == "Round 2")
+    }
+
+    @Test func timerAndStopwatchShowNoPosition() {
+        var timer = session(.timer(duration: .seconds(300)))
+        var stopwatch = session(.stopwatch)
+
+        #expect(display(&timer, at: 10).position == nil)
+        #expect(display(&stopwatch, at: 10).position == nil)
+    }
+}
+
+@Suite struct NextPhase {
+    @Test func workIsFollowedByRest() {
+        var workout = session(intervals)
+
+        #expect(display(&workout, at: 10).nextPhase == "Rest 0:15")
+    }
+
+    @Test func restIsFollowedByWork() {
+        var workout = session(intervals)
+
+        #expect(display(&workout, at: 50).nextPhase == "Work 0:45")
+    }
+
+    @Test func getReadyIsFollowedByTheFirstPhase() {
+        var workout = session(intervals, getReady: 10)
+
+        #expect(display(&workout, at: 1).nextPhase == "Work 0:45")
+    }
+
+    @Test func theLastWorkPhaseSaysSo() {
+        var workout = session(intervals)
+
+        #expect(display(&workout, at: 430).nextPhase == "Last round")
+    }
+
+    @Test func theLastSetSaysSo() {
+        var workout = session(.sets(rest: .seconds(90), sets: 1))
+
+        #expect(display(&workout, at: 10).nextPhase == "Last set")
+    }
+}
+
+@Suite struct StateAndProgress {
+    @Test func stateFollowsThePhase() {
+        var workout = session(.intervals(work: .seconds(45), rest: .seconds(15), rounds: 2), getReady: 10)
+
+        #expect(display(&workout, at: 1).state == .getReady)
+        #expect(display(&workout, at: 11).state == .work)
+        #expect(display(&workout, at: 56).state == .rest)
+    }
+
+    @Test func finalSecondsAtThreeSecondsOrLess() {
+        var workout = session(intervals)
+
+        #expect(display(&workout, at: 41.9).state == .work)
+        #expect(display(&workout, at: 42).state == .finalSeconds)
+        #expect(display(&workout, at: 44.9).state == .finalSeconds)
+    }
+
+    @Test func getReadyHasFinalSecondsToo() {
+        var workout = session(intervals, getReady: 10)
+
+        #expect(display(&workout, at: 8).state == .finalSeconds)
+    }
+
+    @Test func countUpPhasesHaveNoFinalSeconds() {
+        var workout = session(.stopwatch)
+
+        #expect(display(&workout, at: 1).state == .work)
+    }
+
+    @Test func pausedOverridesThePhaseAndSaysSo() {
+        var workout = session(intervals)
+        workout.pause(at(43))
+
+        let screen = display(&workout, at: 50)
+
+        #expect(screen.state == .paused)
+        #expect(screen.label == "PAUSED")
+    }
+
+    @Test func theLabelNamesThePhaseDuringFinalSeconds() {
+        var workout = session(intervals)
+
+        #expect(display(&workout, at: 43).label == "WORK")
+    }
+
+    @Test func halfwayThroughAPhaseIsHalfDrained() {
+        var workout = session(.timer(duration: .seconds(300)), getReady: 10)
+
+        #expect(display(&workout, at: 5).phaseProgress == 0.5)
+        #expect(display(&workout, at: 160).phaseProgress == 0.5)
+    }
+
+    @Test func halfwayThroughAWorkoutFillsHalfTheBar() {
+        var workout = session(.emom(window: .seconds(60), rounds: 10))
+
+        #expect(display(&workout, at: 300).workoutProgress == 0.5)
+    }
+
+    @Test func getReadyLeavesTheWorkoutBarEmpty() {
+        var workout = session(.emom(window: .seconds(60), rounds: 10), getReady: 10)
+
+        #expect(display(&workout, at: 5).workoutProgress == 0)
+    }
+
+    @Test func stopwatchHasNoBarOrDrain() {
+        var workout = session(.stopwatch)
+
+        let screen = display(&workout, at: 30)
+
+        #expect(screen.workoutProgress == nil)
+        #expect(screen.phaseProgress == nil)
+    }
+}

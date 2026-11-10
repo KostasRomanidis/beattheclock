@@ -20,9 +20,9 @@
 
 ## 4. Engine: display content
 
-- [ ] 4.1 Add `SessionDisplay` with time formatting and countdown rounding, and verify tests cover 0:45, 1:02:05 and 0.4 seconds left showing 0:01
-- [ ] 4.2 Add main number, secondary total, position and next-phase rules for all workout types, and verify tests cover the spec's table, including 5:37 left at round 3 with 0:37 remaining
-- [ ] 4.3 Add state and progress values, including final seconds at 3 seconds or less, and verify tests cover state changes, halfway phase and workout progress, and no bar for Stopwatch
+- [x] 4.1 Add `SessionDisplay` with time formatting and countdown rounding, and verify tests cover 0:45, 1:02:05 and 0.4 seconds left showing 0:01
+- [x] 4.2 Add main number, secondary total, position and next-phase rules for all workout types, and verify tests cover the spec's table, including 5:37 left at round 3 with 0:37 remaining
+- [x] 4.3 Add state and progress values, including final seconds at 3 seconds or less, and verify tests cover state changes, halfway phase and workout progress, and no bar for Stopwatch
 
 ## 5. App: setup
 
