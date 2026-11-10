@@ -4,7 +4,7 @@ A workout timer for Mac and iPad, built to be read from across the room. It has 
 
 ## Requirements
 
-- Xcode 27.2 or later (Swift 6.4)
+- Xcode 27.2 or later
 - macOS 14 or later, or iPadOS 17 or later
 
 ## Project layout
@@ -24,18 +24,18 @@ swift test
 
 ## Build
 
-From the project root:
+From the project root. Signing is turned off so these work without the project's development team:
 
 ```sh
 # Mac
-xcodebuild -project beattheclock.xcodeproj -scheme beattheclock -destination 'platform=macOS' build
+xcodebuild -project beattheclock.xcodeproj -scheme beattheclock -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO build
 
 # iPad simulator
-xcodebuild -project beattheclock.xcodeproj -scheme beattheclock -destination 'generic/platform=iOS Simulator' build
+xcodebuild -project beattheclock.xcodeproj -scheme beattheclock -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
 ```
 
 ## Run
 
 Open `beattheclock.xcodeproj` in Xcode, choose **My Mac**, an iPad simulator or a connected iPad as the run destination, and press ⌘R.
 
-Running on a real iPad needs your Apple account selected under the target's **Signing & Capabilities**. With a free account the app expires after 7 days and needs reinstalling from Xcode; a paid developer account avoids that.
+Running from Xcode, on the Mac or a real iPad, needs your own Apple account selected as the team under the target's **Signing & Capabilities**. With a free account the app expires after 7 days and needs reinstalling from Xcode; a paid developer account avoids that.
