@@ -24,6 +24,7 @@ final class SessionController {
 
     /// Runs while the live view is showing; SwiftUI cancels it when the view goes away.
     func run() async {
+        await cuePlayer.prepare()
         while !Task.isCancelled {
             tick()
             try? await Task.sleep(for: Self.tickInterval)
@@ -46,7 +47,10 @@ final class SessionController {
         let now = ContinuousClock.now
         let cues = session.update(now)
         display = SessionDisplay(session: session, now: now)
-        cues.forEach(cuePlayer.play)
+        // One task per tick keeps a tick's cues in order.
+        if !cues.isEmpty {
+            Task { [cuePlayer] in for cue in cues { await cuePlayer.play(cue) } }
+        }
         // Awake while running or paused; normal sleep returns once the summary shows.
         wake.isActive = session.status != .finished
     }

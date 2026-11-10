@@ -3,21 +3,18 @@ import WorkoutEngine
 
 /// Plays the workout cues as short sine tones generated at launch, so there are no audio assets.
 /// Cues mix with other audio and, on iPad, play with the silent setting on.
-final class CuePlayer {
-    private static let sampleRate = 44_100.0
-    private static let amplitude: Float = 0.6
-    private static let fade = 0.005
+/// An actor so the blocking audio session and engine calls stay off the main thread.
+actor CuePlayer {
+    private nonisolated static let sampleRate = 44_100.0
+    private nonisolated static let amplitude: Float = 0.6
+    private nonisolated static let fade = 0.005
 
     private let engine = AVAudioEngine()
     private let player = AVAudioPlayerNode()
     private let buffers: [CueEvent: AVAudioPCMBuffer]
+    private var sessionReady = false
 
     init() {
-        #if os(iOS)
-        // Playback ignores the silent setting; mixing keeps other apps' music playing.
-        try? AVAudioSession.sharedInstance().setCategory(.playback, options: .mixWithOthers)
-        try? AVAudioSession.sharedInstance().setActive(true)
-        #endif
         let format = AVAudioFormat(standardFormatWithSampleRate: Self.sampleRate, channels: 1)!
         buffers = [
             .tick: Self.tones([(1760, 0.06)], format: format),
@@ -27,6 +24,23 @@ final class CuePlayer {
         ]
         engine.attach(player)
         engine.connect(player, to: engine.mainMixerNode, format: format)
+    }
+
+    /// Sets the category and activates the session once, before the first cue.
+    func prepare() async {
+        #if os(iOS)
+        guard !sessionReady else { return }
+        // Set before the await so a call arriving during the suspension returns at once.
+        sessionReady = true
+        let session = AVAudioSession.sharedInstance()
+        // Playback ignores the silent setting; mixing keeps other apps' music playing.
+        try? session.setCategory(.playback, options: .mixWithOthers)
+        if #available(iOS 27, *) {
+            _ = try? await session.activate(options: [])
+        } else {
+            try? session.setActive(true)
+        }
+        #endif
     }
 
     func play(_ cue: CueEvent) {
@@ -40,7 +54,7 @@ final class CuePlayer {
     }
 
     /// Notes played one after another, each faded in and out to avoid clicks.
-    private static func tones(_ notes: [(frequency: Double, seconds: Double)], format: AVAudioFormat) -> AVAudioPCMBuffer {
+    private nonisolated static func tones(_ notes: [(frequency: Double, seconds: Double)], format: AVAudioFormat) -> AVAudioPCMBuffer {
         let totalFrames = notes.reduce(0) { $0 + Int($1.seconds * sampleRate) }
         let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(totalFrames))!
         buffer.frameLength = AVAudioFrameCount(totalFrames)
