@@ -7,9 +7,9 @@
 
 ## 2. Engine: configurations and timelines
 
-- [ ] 2.1 Add `WorkoutConfiguration` with one case per workout type and the spec's defaults, and verify with tests for all eight defaults
-- [ ] 2.2 Add `Segment` and the four timeline builders (countdown, intervals, count up, sets), and verify with tests for 8 x 0:45/0:15, 3 AMRAP blocks, EMOM, zero rest and no trailing rest
-- [ ] 2.3 Add the calculated total, and verify tests give 7:45 for the Intervals example, 17:00 for the AMRAP example, and no total for For Time, Stopwatch and Sets
+- [x] 2.1 Add `WorkoutConfiguration` with one case per workout type and the spec's defaults, and verify with tests for all eight defaults
+- [x] 2.2 Add `Segment` and the four timeline builders (countdown, intervals, count up, sets), and verify with tests for 8 x 0:45/0:15, 3 AMRAP blocks, EMOM, zero rest and no trailing rest
+- [x] 2.3 Add the calculated total, and verify tests give 7:45 for the Intervals example, 17:00 for the AMRAP example, and no total for For Time, Stopwatch and Sets
 
 ## 3. Engine: session behaviour
 
