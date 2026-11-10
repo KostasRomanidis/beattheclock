@@ -217,6 +217,26 @@ private let sets = WorkoutConfiguration.sets(rest: .seconds(90), sets: 3)
         #expect(held.roundsCounted == 0)
     }
 
+    @Test func holdPausesAndResumesWithoutCountingARound() {
+        var workout = session(amrap)
+
+        workout.hold(at(30))
+        #expect(workout.status == .paused)
+
+        workout.hold(at(40))
+        #expect(workout.status == .running)
+        #expect(workout.roundsCounted == 0)
+    }
+
+    @Test func holdPausesGetReadyInsteadOfSkippingIt() {
+        var workout = session(intervals, getReady: 10)
+
+        workout.hold(at(2))
+
+        #expect(workout.status == .paused)
+        #expect(workout.isInGetReady)
+    }
+
     @Test func undoRemovesTheLastRound() {
         var workout = session(amrap)
         for second in 1...4 { workout.tap(at(Double(second))) }

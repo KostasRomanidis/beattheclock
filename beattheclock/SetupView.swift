@@ -5,6 +5,7 @@ import WorkoutEngine
 struct SetupView: View {
     @Binding var configuration: WorkoutConfiguration
     @Binding var getReady: Duration
+    let onStart: () -> Void
 
     var body: some View {
         Form {
@@ -21,6 +22,14 @@ struct SetupView: View {
                     }
                 }
                 .pickerStyle(.segmented)
+            }
+            Section {
+                Button(action: onStart) {
+                    Text("Start").font(.title3.weight(.semibold)).frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .keyboardShortcut(.defaultAction)
             }
         }
         .formStyle(.grouped)
@@ -129,6 +138,6 @@ private struct CountStepper: View {
 
 #Preview {
     NavigationStack {
-        SetupView(configuration: .constant(WorkoutConfiguration.defaults[4]), getReady: .constant(.seconds(10)))
+        SetupView(configuration: .constant(WorkoutConfiguration.defaults[4]), getReady: .constant(.seconds(10))) {}
     }
 }

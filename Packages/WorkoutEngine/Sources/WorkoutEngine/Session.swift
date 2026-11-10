@@ -129,6 +129,15 @@ public struct Session: Sendable {
         }
     }
 
+    /// Press and hold: pauses or resumes in any phase, never performing the main action.
+    public mutating func hold(_ now: Instant) {
+        if status == .paused {
+            resume(now)
+        } else {
+            pause(now)
+        }
+    }
+
     /// Tap or click: the phase's main action if it has one, otherwise the same as the space bar.
     public mutating func tap(_ now: Instant) {
         if availableAction != nil {

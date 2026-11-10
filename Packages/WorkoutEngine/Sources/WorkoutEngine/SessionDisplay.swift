@@ -101,7 +101,7 @@ public struct SessionDisplay: Equatable, Sendable {
     }
 
     private static func roundsCountedText(_ session: Session) -> String? {
-        guard case .amrap(_, _, _, true) = session.configuration else { return nil }
+        guard session.configuration.countsRounds else { return nil }
         let count = session.roundsCounted
         return count == 1 ? "1 round" : "\(count) rounds"
     }
@@ -133,6 +133,12 @@ extension Segment.Kind {
 }
 
 extension WorkoutConfiguration {
+    /// Whether the athlete counts AMRAP rounds, which also shows the undo control.
+    public var countsRounds: Bool {
+        guard case .amrap(_, _, _, true) = self else { return false }
+        return true
+    }
+
     /// The name for one repeat of the workout, for workouts that have several.
     var roundUnit: String? {
         switch self {

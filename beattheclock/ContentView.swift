@@ -13,9 +13,19 @@ import WorkoutEngine
 struct ContentView: View {
     @State private var configurations = WorkoutConfiguration.defaults
     @State private var getReady = SetupLimits.defaultGetReady
+    @State private var path: [Int] = []
+    @State private var controller: SessionController?
 
     var body: some View {
-        NavigationStack {
+        if let controller {
+            SessionView(controller: controller) { self.controller = nil }
+        } else {
+            setup
+        }
+    }
+
+    private var setup: some View {
+        NavigationStack(path: $path) {
             ScrollView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: 16)], spacing: 16) {
                     ForEach(configurations.indices, id: \.self) { index in
@@ -32,7 +42,9 @@ struct ContentView: View {
             }
             .navigationTitle("Beat the Clock")
             .navigationDestination(for: Int.self) { index in
-                SetupView(configuration: $configurations[index], getReady: $getReady)
+                SetupView(configuration: $configurations[index], getReady: $getReady) {
+                    controller = SessionController(configuration: configurations[index], getReady: getReady)
+                }
             }
         }
     }

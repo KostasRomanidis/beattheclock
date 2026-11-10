@@ -31,11 +31,11 @@
 
 ## 6. App: live session
 
-- [ ] 6.1 Add `SessionController` with the 100 ms tick, and verify by running that a short Intervals workout advances correctly and the timing is right against a separate clock
-- [ ] 6.2 Add the live view with scaling digits, phase colours, drain, progress bar and the secondary information, and verify by resizing the Mac window and rotating an iPad that digits never clip
-- [ ] 6.3 Add tap, hold and keyboard handling from the design's control table, and verify each control on Mac and iPad, including that a hold never counts a round
-- [ ] 6.4 Add the paused state and summary screen with repeat and back to setup, and verify by ending a workout early and repeating one, checking the correct results are shown and that nothing persists after a relaunch
-- [ ] 6.5 Check colour contrast at 4.5:1 or better for all states, add accessibility labels to all controls, and verify using Xcode's Accessibility Inspector and VoiceOver on the undo control
+- [x] 6.1 Add `SessionController` with the 100 ms tick, and verify by running that a short Intervals workout advances correctly and the timing is right against a separate clock
+- [x] 6.2 Add the live view with scaling digits, phase colours, drain, progress bar and the secondary information, and verify by resizing the Mac window and rotating an iPad that digits never clip
+- [x] 6.3 Add tap, hold and keyboard handling from the design's control table, and verify each control on Mac and iPad, including that a hold never counts a round
+- [x] 6.4 Add the paused state and summary screen with repeat and back to setup, and verify by ending a workout early and repeating one, checking the correct results are shown and that nothing persists after a relaunch
+- [x] 6.5 Check colour contrast at 4.5:1 or better for all states, add accessibility labels to all controls, and verify using Xcode's Accessibility Inspector and VoiceOver on the undo control
 
 ## 7. App: system integration
 
