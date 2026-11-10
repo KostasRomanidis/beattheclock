@@ -6,16 +6,50 @@
 //
 
 import SwiftUI
+import WorkoutEngine
 
+/// The grid of workout types. Settings live here in memory only, so they last while the
+/// app is open and return to their defaults on the next launch.
 struct ContentView: View {
+    @State private var configurations = WorkoutConfiguration.defaults
+    @State private var getReady = SetupLimits.defaultGetReady
+
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+        NavigationStack {
+            ScrollView {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: 16)], spacing: 16) {
+                    ForEach(configurations.indices, id: \.self) { index in
+                        NavigationLink(value: index) {
+                            Text(configurations[index].name)
+                                .font(.title2.weight(.semibold))
+                                .frame(maxWidth: .infinity, minHeight: 100)
+                                .background(.quaternary, in: .rect(cornerRadius: 16))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding()
+            }
+            .navigationTitle("Beat the Clock")
+            .navigationDestination(for: Int.self) { index in
+                SetupView(configuration: $configurations[index], getReady: $getReady)
+            }
         }
-        .padding()
+    }
+}
+
+extension WorkoutConfiguration {
+    var name: String {
+        switch self {
+        case .timer: "Timer"
+        case .amrap: "AMRAP"
+        case .emom: "EMOM"
+        case .tabata: "Tabata"
+        case .intervals: "Intervals"
+        case .forTime: "For Time"
+        case .stopwatch: "Stopwatch"
+        case .sets: "Sets"
+        }
     }
 }
 
