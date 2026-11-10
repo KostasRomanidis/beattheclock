@@ -26,8 +26,8 @@
 
 ## 5. App: setup
 
-- [ ] 5.1 Add the workout grid, with navigation to setup, and verify by running that all eight types appear on Mac and iPad
-- [ ] 5.2 Add setup forms for each type, with limits, the calculated total and the shared get-ready presets, and verify by running that the example shows 7:45, limits hold, and values reset after a relaunch
+- [x] 5.1 Add the workout grid, with navigation to setup, and verify by running that all eight types appear on Mac and iPad
+- [x] 5.2 Add setup forms for each type, with limits, the calculated total and the shared get-ready presets, and verify by running that the example shows 7:45, limits hold, and values reset after a relaunch
 
 ## 6. App: live session
 

@@ -102,13 +102,12 @@ private struct DurationStepper: View {
     }
 
     var body: some View {
-        Stepper {
-            LabeledContent(title, value: SessionDisplay.format(value))
-        } onIncrement: {
-            value = SetupLimits.stepUp(value)
-        } onDecrement: {
-            value = SetupLimits.stepDown(value, minimum: minimum)
-        }
+        // A nil action disables that button, so the limit is visible like the count steppers.
+        Stepper(
+            label: { LabeledContent(title, value: SessionDisplay.format(value)) },
+            onIncrement: value < SetupLimits.maximumDuration ? { value = SetupLimits.stepUp(value) } : nil,
+            onDecrement: value > minimum ? { value = SetupLimits.stepDown(value, minimum: minimum) } : nil
+        )
     }
 }
 
