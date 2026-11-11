@@ -10,9 +10,11 @@ import WorkoutEngine
 
 @main
 struct beattheclockApp: App {
+    @State private var cuePlayer = CuePlayer()
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ContentView(cuePlayer: cuePlayer)
         }
     }
 }

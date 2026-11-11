@@ -9,7 +9,9 @@ final class SessionController {
     static let tickInterval: Duration = .milliseconds(100)
     static let hundredthsTickInterval: Duration = .milliseconds(16)
 
-    private(set) var session: Session
+    // Only `display` is observed. Everything the screen shows from the session also changes
+    // the display, so views redraw only when something visible changes, not on every tick.
+    @ObservationIgnored private(set) var session: Session
     private(set) var display: SessionDisplay
     private let getReady: Duration
     private let cuePlayer: CuePlayer
@@ -28,7 +30,8 @@ final class SessionController {
     func run() async {
         await cuePlayer.prepare()
         while !Task.isCancelled {
-            tick()
+            // Nothing moves on the summary; `restart` ticks again when the workout repeats.
+            if session.status != .finished { tick() }
             try? await Task.sleep(for: interval)
         }
     }
@@ -53,7 +56,8 @@ final class SessionController {
     private func tick() {
         let now = ContinuousClock.now
         let cues = session.update(now)
-        display = SessionDisplay(session: session, now: now)
+        let display = SessionDisplay(session: session, now: now)
+        if display != self.display { self.display = display }
         // One task per tick keeps a tick's cues in order.
         if !cues.isEmpty {
             Task { [cuePlayer] in for cue in cues { await cuePlayer.play(cue) } }

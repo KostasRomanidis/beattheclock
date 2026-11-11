@@ -9,7 +9,8 @@ struct SessionView: View {
 
     var body: some View {
         Group {
-            if controller.session.status == .finished {
+            // Reads `display`, the controller's only observed value, so the summary appears on finishing.
+            if controller.display.state == .finished {
                 SummaryView(session: controller.session, onRepeat: controller.restart, onExit: onExit)
             } else {
                 LiveView(controller: controller)
