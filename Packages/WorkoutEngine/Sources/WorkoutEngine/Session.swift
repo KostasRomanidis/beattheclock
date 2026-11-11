@@ -21,6 +21,11 @@ public struct Session: Sendable {
 
     public let configuration: WorkoutConfiguration
     public let segments: [Segment]
+    /// The calculated total, worked out once. Nil when the athlete decides when a phase ends.
+    public let total: Duration?
+    /// The number of work segments before each index, so positions need no scan per tick.
+    let workBefore: [Int]
+    let workCount: Int
     public private(set) var status: Status = .running
     public private(set) var segmentIndex = 0
     public private(set) var roundsCounted = 0
@@ -41,8 +46,18 @@ public struct Session: Sendable {
     /// Starts the workout at `now`, beginning with get-ready unless `getReady` is zero.
     public init(configuration: WorkoutConfiguration, getReady: Duration, startingAt now: Instant) {
         let getReadySegments = getReady > .zero ? [Segment(kind: .getReady, ending: .afterDuration(getReady))] : []
+        let segments = getReadySegments + configuration.timeline()
+        var workBefore: [Int] = []
+        var workCount = 0
+        for segment in segments {
+            workBefore.append(workCount)
+            if segment.kind == .work { workCount += 1 }
+        }
         self.configuration = configuration
-        self.segments = getReadySegments + configuration.timeline()
+        self.segments = segments
+        self.total = configuration.total
+        self.workBefore = workBefore
+        self.workCount = workCount
         self.segmentStart = now
         self.cueCursor = now
         begin(0, at: now)

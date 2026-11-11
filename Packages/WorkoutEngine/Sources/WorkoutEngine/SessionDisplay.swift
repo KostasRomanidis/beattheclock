@@ -29,18 +29,17 @@ public struct SessionDisplay: Equatable, Sendable {
         let segment = session.currentSegment
         let timeLeft = session.timeLeftInSegment(now)
         let workoutTime = session.workoutTime(now)
-        let total = session.configuration.total
-
+        let total = session.total
         let elapsed = session.elapsedInSegment(now)
         mainTime = timeLeft.map { Self.format($0, roundingUp: true) } ?? Self.format(elapsed)
         mainFraction = timeLeft == nil && session.configuration.showsHundredths
             ? Self.fraction(max(elapsed, .zero).components.attoseconds) : nil
         label = session.status == .paused ? "PAUSED" : segment.kind.label
         state = Self.state(session: session, timeLeft: timeLeft)
-        secondaryTotal = Self.secondaryTotal(session.configuration, workoutTime: workoutTime)
+        secondaryTotal = Self.secondaryTotal(session.configuration, total: total, workoutTime: workoutTime)
         position = Self.position(session)
         nextPhase = Self.nextPhase(session)
-        phaseProgress = segment.countdownDuration.map { Self.fraction(session.elapsedInSegment(now), of: $0) }
+        phaseProgress = segment.countdownDuration.map { Self.fraction(elapsed, of: $0) }
         workoutProgress = total.map { Self.fraction(workoutTime, of: $0) }
     }
 
@@ -90,13 +89,13 @@ public struct SessionDisplay: Equatable, Sendable {
         }
     }
 
-    private static func secondaryTotal(_ configuration: WorkoutConfiguration, workoutTime: Duration) -> String? {
+    private static func secondaryTotal(_ configuration: WorkoutConfiguration, total: Duration?, workoutTime: Duration) -> String? {
         switch configuration {
         case .intervals, .tabata, .emom:
-            return configuration.total.map { left($0 - workoutTime) }
+            return total.map { left($0 - workoutTime) }
         case .amrap(_, let blocks, _, _):
             guard blocks > 1 else { return nil }
-            return configuration.total.map { left($0 - workoutTime) }
+            return total.map { left($0 - workoutTime) }
         case .forTime(let cap):
             return cap.map { left($0 - workoutTime) }
         case .sets:
@@ -118,8 +117,8 @@ public struct SessionDisplay: Equatable, Sendable {
 
         // Counting work phases before this one, plus one, gives the current work phase,
         // or during rest and get-ready, the one that comes next.
-        let workSegments = session.segments.filter { $0.kind == .work }.count
-        let workSoFar = session.segments[..<session.segmentIndex].filter { $0.kind == .work }.count
+        let workSegments = session.workCount
+        let workSoFar = session.workBefore[session.segmentIndex]
         let next = session.currentSegment.kind == .work ? "" : " next"
         if let exercises = configuration.emomExercises {
             let round = "\(unit) \(workSoFar / exercises + 1) of \(workSegments / exercises)"
@@ -144,7 +143,7 @@ public struct SessionDisplay: Equatable, Sendable {
         }
         let next = session.segments[nextIndex]
         if let exercises, next.kind == .work, let duration = next.countdownDuration {
-            let exercise = session.segments[..<nextIndex].filter { $0.kind == .work }.count % exercises + 1
+            let exercise = session.workBefore[nextIndex] % exercises + 1
             return "Next: Exercise \(exercise) · \(format(duration))"
         }
         return "Next: " + (next.countdownDuration.map { "\(next.kind.name) \(format($0))" } ?? next.kind.name)
@@ -182,8 +181,9 @@ extension WorkoutConfiguration {
 
     /// Exercises per EMOM round, when there is more than one to show within a round.
     var emomExercises: Int? {
-        guard case .emom(_, let exercises, _, _) = self, exercises > 1 else { return nil }
-        return exercises
+        // Clamped like the timeline, so positions match the windows that actually run.
+        guard case .emom(_, let exercises, _, _) = self, SetupLimits.clamp(exercises) > 1 else { return nil }
+        return SetupLimits.clamp(exercises)
     }
 
     /// The name for one repeat of the workout, for workouts that have several.

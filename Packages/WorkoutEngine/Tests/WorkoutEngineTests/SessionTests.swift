@@ -474,3 +474,20 @@ private let sets = WorkoutConfiguration.sets(rest: .seconds(90), sets: 3)
         #expect(workout.update(at(25.5)) == [.restStart])
     }
 }
+
+@Suite struct SessionSetup {
+    @Test func invalidCountsWithNoGetReadyDoNotCrash() {
+        var workout = session(.emom(window: .seconds(60), exercises: 0, rounds: 0, rest: .zero))
+
+        #expect(workout.segments.count == 1)
+        _ = workout.update(at(61))
+        #expect(workout.status == .finished)
+    }
+
+    @Test func totalExcludesGetReady() {
+        let intervals = WorkoutConfiguration.intervals(work: .seconds(45), rest: .seconds(15), rounds: 8)
+
+        #expect(session(intervals, getReady: 10).total == intervals.total)
+        #expect(session(.stopwatch).total == nil)
+    }
+}

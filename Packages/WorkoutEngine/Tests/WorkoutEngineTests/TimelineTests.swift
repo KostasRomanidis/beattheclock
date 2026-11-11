@@ -117,3 +117,26 @@ private let set = Segment(kind: .work, ending: .byUser(cap: nil))
         #expect(WorkoutConfiguration.sets(rest: .seconds(90), sets: 5).total == nil)
     }
 }
+
+@Suite struct InvalidCounts {
+    private func workSegments(_ configuration: WorkoutConfiguration) -> Int {
+        configuration.timeline().filter { $0.kind == .work }.count
+    }
+
+    @Test func zeroAndNegativeCountsStillBuildOneWorkPhase() {
+        let configurations: [WorkoutConfiguration] = [
+            .amrap(block: .seconds(60), blocks: 0, rest: .seconds(60), countsRounds: false),
+            .emom(window: .seconds(60), exercises: 0, rounds: 0, rest: .seconds(60)),
+            .tabata(rounds: -1),
+            .intervals(work: .seconds(20), rest: .seconds(10), rounds: 0),
+            .sets(rest: .seconds(60), sets: -3),
+        ]
+        for configuration in configurations {
+            #expect(workSegments(configuration) == 1)
+        }
+    }
+
+    @Test func countsAboveTheLimitStopAtTheLimit() {
+        #expect(workSegments(.tabata(rounds: 500)) == SetupLimits.counts.upperBound)
+    }
+}

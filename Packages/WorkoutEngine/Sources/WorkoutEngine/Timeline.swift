@@ -15,24 +15,26 @@ public struct Segment: Equatable, Sendable {
 
 extension WorkoutConfiguration {
     /// The workout as a flat list of segments, excluding the get-ready countdown.
+    /// Counts are clamped to `SetupLimits.counts`, so there is always at least one segment.
     public func timeline() -> [Segment] {
-        switch self {
+        let clamp = SetupLimits.clamp
+        return switch self {
         case .timer(let duration):
             Self.countdown(duration)
         case .amrap(let block, let blocks, let rest, _):
-            Self.intervals(work: block, rest: rest, rounds: blocks)
+            Self.intervals(work: block, rest: rest, rounds: clamp(blocks))
         case .emom(let window, let exercises, let rounds, let rest):
-            Self.emom(window: window, exercises: exercises, rounds: rounds, rest: rest)
+            Self.emom(window: window, exercises: clamp(exercises), rounds: clamp(rounds), rest: rest)
         case .tabata(let rounds):
-            Self.intervals(work: Self.tabataWork, rest: Self.tabataRest, rounds: rounds)
+            Self.intervals(work: Self.tabataWork, rest: Self.tabataRest, rounds: clamp(rounds))
         case .intervals(let work, let rest, let rounds):
-            Self.intervals(work: work, rest: rest, rounds: rounds)
+            Self.intervals(work: work, rest: rest, rounds: clamp(rounds))
         case .forTime(let cap):
             Self.countUp(cap: cap)
         case .stopwatch:
             Self.countUp(cap: nil)
         case .sets(let rest, let sets):
-            Self.sets(rest: rest, sets: sets)
+            Self.sets(rest: rest, sets: clamp(sets))
         }
     }
 
