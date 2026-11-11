@@ -92,9 +92,10 @@ private struct LiveView: View {
         }
     }
 
+    // The hundredths are half the size of the time, and the whole number scales as one piece.
     private var mainNumber: some View {
-        Text(display.mainTime)
-            .font(.system(size: 1000, weight: .heavy, design: .rounded))
+        (Text(display.mainTime).font(.system(size: 1000, weight: .heavy, design: .rounded))
+            + Text(display.mainFraction ?? "").font(.system(size: 500, weight: .heavy, design: .rounded)))
             .monospacedDigit()
             .lineLimit(1)
             .minimumScaleFactor(0.01)
@@ -191,19 +192,23 @@ private struct SummaryView: View {
     let onRepeat: () -> Void
     let onExit: () -> Void
 
+    private func format(_ duration: Duration) -> String {
+        SessionDisplay.format(duration, hundredths: session.configuration.showsHundredths)
+    }
+
     var body: some View {
         VStack(spacing: 24) {
             Text(session.configuration.name).font(.largeTitle.weight(.bold))
-            Text(SessionDisplay.format(session.workoutTime(.now)))
+            Text(format(session.workoutTime(.now)))
                 .font(.system(size: 96, weight: .heavy, design: .rounded))
                 .monospacedDigit()
-                .accessibilityLabel("Workout time \(SessionDisplay.format(session.workoutTime(.now)))")
+                .accessibilityLabel("Workout time \(format(session.workoutTime(.now)))")
             VStack(spacing: 8) {
                 if session.configuration.countsRounds {
                     LabeledContent("Rounds", value: "\(session.roundsCounted)")
                 }
                 ForEach(Array(session.splits.enumerated()), id: \.offset) { index, split in
-                    LabeledContent("Round \(index + 1)", value: SessionDisplay.format(split))
+                    LabeledContent("Round \(index + 1)", value: format(split))
                 }
             }
             .font(.title2)

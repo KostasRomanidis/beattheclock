@@ -40,6 +40,51 @@ private let circuit = WorkoutConfiguration.emom(window: .seconds(60), exercises:
     @Test func elapsedTimeRoundsDown() {
         #expect(SessionDisplay.format(.milliseconds(59_900)) == "0:59")
     }
+
+    @Test func hundredthsAreCutOffNotRounded() {
+        #expect(SessionDisplay.format(.milliseconds(130_679), hundredths: true) == "2:10.67")
+        #expect(SessionDisplay.format(.milliseconds(59_996), hundredths: true) == "0:59.99")
+    }
+
+    @Test func hundredthsAreAlwaysTwoDigits() {
+        #expect(SessionDisplay.format(.seconds(240), hundredths: true) == "4:00.00")
+        #expect(SessionDisplay.format(.milliseconds(5_050), hundredths: true) == "0:05.05")
+    }
+
+    @Test func hundredthsComeAfterHours() {
+        #expect(SessionDisplay.format(.milliseconds((3600 + 2 * 60 + 5) * 1000 + 500), hundredths: true) == "1:02:05.50")
+    }
+}
+
+@Suite struct PresetLabels {
+    @Test func wholeMinutesReadInMinutes() {
+        #expect(SessionDisplay.presetLabel(.seconds(12 * 60)) == "12 min")
+        #expect(SessionDisplay.presetLabel(.seconds(60)) == "1 min")
+    }
+
+    @Test func otherTimesReadInSeconds() {
+        #expect(SessionDisplay.presetLabel(.seconds(20)) == "20 s")
+        #expect(SessionDisplay.presetLabel(.seconds(90)) == "90 s")
+    }
+
+    @Test func zeroReadsNone() {
+        #expect(SessionDisplay.presetLabel(.zero) == "None")
+    }
+
+    @Test func everyDurationPresetReadsAsWords() {
+        let presets = SetupLimits.durationPresets + SetupLimits.capPresets + SetupLimits.windowPresets
+            + SetupLimits.workPresets + SetupLimits.restPresets + SetupLimits.longRestPresets
+        for preset in presets {
+            let label = SessionDisplay.presetLabel(preset)
+            #expect(label == "None" || label.hasSuffix(" min") || label.hasSuffix(" s"))
+            #expect(!label.contains(":"))
+        }
+    }
+
+    @Test func intervalsPresetsMatchTheSpec() {
+        #expect(SetupLimits.workPresets.map(SessionDisplay.presetLabel) == ["20 s", "30 s", "40 s", "45 s", "1 min", "2 min"])
+        #expect(SetupLimits.restPresets.map(SessionDisplay.presetLabel) == ["None", "10 s", "15 s", "20 s", "30 s", "1 min"])
+    }
 }
 
 @Suite struct MainNumber {
@@ -68,6 +113,38 @@ private let circuit = WorkoutConfiguration.emom(window: .seconds(60), exercises:
         var workout = session(intervals, getReady: 10)
 
         #expect(display(&workout, at: 0.5).mainTime == "0:10")
+    }
+
+    @Test func forTimeAddsHundredthsAfterWholeSeconds() {
+        var workout = session(.forTime(cap: nil))
+
+        let screen = display(&workout, at: 270.25)
+
+        #expect(screen.mainTime == "4:30")
+        #expect(screen.mainFraction == ".25")
+    }
+
+    @Test func stopwatchStaysInWholeSeconds() {
+        var workout = session(.stopwatch)
+
+        let screen = display(&workout, at: 270.25)
+
+        #expect(screen.mainTime == "4:30")
+        #expect(screen.mainFraction == nil)
+    }
+
+    @Test func forTimeGetReadyHasNoHundredths() {
+        var workout = session(.forTime(cap: nil), getReady: 10)
+
+        #expect(display(&workout, at: 0.5).mainFraction == nil)
+    }
+
+    @Test func countdownsAndSetsHaveNoHundredths() {
+        var intervalsWork = session(intervals)
+        var setsWork = session(sets)
+
+        #expect(display(&intervalsWork, at: 8.25).mainFraction == nil)
+        #expect(display(&setsWork, at: 25.25).mainFraction == nil)
     }
 }
 
@@ -110,6 +187,12 @@ private let circuit = WorkoutConfiguration.emom(window: .seconds(60), exercises:
         var workout = session(sets)
 
         #expect(display(&workout, at: 720).secondaryTotal == "12:00 elapsed")
+    }
+
+    @Test func capLeftStaysInWholeSeconds() {
+        var workout = session(.forTime(cap: .seconds(20 * 60)))
+
+        #expect(display(&workout, at: 12 * 60 + 10.4).secondaryTotal == "7:50 left")
     }
 
     @Test func timerAndStopwatchShowNoTotal() {
@@ -190,49 +273,49 @@ private let circuit = WorkoutConfiguration.emom(window: .seconds(60), exercises:
     @Test func workIsFollowedByRest() {
         var workout = session(intervals)
 
-        #expect(display(&workout, at: 10).nextPhase == "Rest 0:15")
+        #expect(display(&workout, at: 10).nextPhase == "Next: Rest 0:15")
     }
 
     @Test func restIsFollowedByWork() {
         var workout = session(intervals)
 
-        #expect(display(&workout, at: 50).nextPhase == "Work 0:45")
+        #expect(display(&workout, at: 50).nextPhase == "Next: Work 0:45")
     }
 
     @Test func getReadyIsFollowedByTheFirstPhase() {
         var workout = session(intervals, getReady: 10)
 
-        #expect(display(&workout, at: 1).nextPhase == "Work 0:45")
+        #expect(display(&workout, at: 1).nextPhase == "Next: Work 0:45")
     }
 
     @Test func emomNamesTheNextExercise() {
         var workout = session(circuit)
 
-        #expect(display(&workout, at: 570).nextPhase == "Exercise 5 1:00")
+        #expect(display(&workout, at: 570).nextPhase == "Next: Exercise 5 · 1:00")
     }
 
     @Test func emomRoundEndsWithRest() {
         var workout = session(circuit)
 
-        #expect(display(&workout, at: 630).nextPhase == "Rest 1:00")
+        #expect(display(&workout, at: 630).nextPhase == "Next: Rest 1:00")
     }
 
-    @Test func theLastEmomExerciseSaysSo() {
+    @Test func theFinalEmomExerciseSaysSo() {
         var workout = session(circuit)
 
-        #expect(display(&workout, at: 990).nextPhase == "Last exercise")
+        #expect(display(&workout, at: 990).nextPhase == "Final exercise")
     }
 
-    @Test func theLastWorkPhaseSaysSo() {
+    @Test func theFinalWorkPhaseSaysSo() {
         var workout = session(intervals)
 
-        #expect(display(&workout, at: 430).nextPhase == "Last round")
+        #expect(display(&workout, at: 430).nextPhase == "Final round")
     }
 
-    @Test func theLastSetSaysSo() {
+    @Test func theFinalSetSaysSo() {
         var workout = session(.sets(rest: .seconds(90), sets: 1))
 
-        #expect(display(&workout, at: 10).nextPhase == "Last set")
+        #expect(display(&workout, at: 10).nextPhase == "Final set")
     }
 }
 

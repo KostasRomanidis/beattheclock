@@ -8,6 +8,9 @@ public struct SessionDisplay: Equatable, Sendable {
 
     /// The largest number: time left in a countdown phase, or time so far in a count-up phase.
     public let mainTime: String
+    /// The hundredths of a second, such as ".25", shown smaller after `mainTime` while For Time
+    /// counts up. Nil everywhere else, where times stay in whole seconds.
+    public let mainFraction: String?
     /// The phase or pause in words, so the state never relies on colour alone.
     public let label: String
     public let state: State
@@ -28,8 +31,10 @@ public struct SessionDisplay: Equatable, Sendable {
         let workoutTime = session.workoutTime(now)
         let total = session.configuration.total
 
-        mainTime = timeLeft.map { Self.format($0, roundingUp: true) }
-            ?? Self.format(session.elapsedInSegment(now))
+        let elapsed = session.elapsedInSegment(now)
+        mainTime = timeLeft.map { Self.format($0, roundingUp: true) } ?? Self.format(elapsed)
+        mainFraction = timeLeft == nil && session.configuration.showsHundredths
+            ? Self.fraction(max(elapsed, .zero).components.attoseconds) : nil
         label = session.status == .paused ? "PAUSED" : segment.kind.label
         state = Self.state(session: session, timeLeft: timeLeft)
         secondaryTotal = Self.secondaryTotal(session.configuration, workoutTime: workoutTime)
@@ -40,15 +45,35 @@ public struct SessionDisplay: Equatable, Sendable {
     }
 
     /// Minutes and seconds, with hours only when needed. Countdowns round up,
-    /// so they show 0:00 only when the phase ends.
-    public static func format(_ duration: Duration, roundingUp: Bool = false) -> String {
+    /// so they show 0:00 only when the phase ends. `hundredths` adds the whole
+    /// hundredths cut off, never rounded, so a time never reads later than it is;
+    /// it is for count-up times and not combined with `roundingUp`.
+    public static func format(_ duration: Duration, roundingUp: Bool = false, hundredths: Bool = false) -> String {
         let (seconds, attoseconds) = max(duration, .zero).components
         let wholeSeconds = Int(seconds) + (roundingUp && attoseconds > 0 ? 1 : 0)
         let (hours, minutes, secondsPart) = (wholeSeconds / 3600, wholeSeconds / 60 % 60, wholeSeconds % 60)
         let paddedSeconds = secondsPart < 10 ? "0\(secondsPart)" : "\(secondsPart)"
-        guard hours > 0 else { return "\(minutes):\(paddedSeconds)" }
-        let paddedMinutes = minutes < 10 ? "0\(minutes)" : "\(minutes)"
-        return "\(hours):\(paddedMinutes):\(paddedSeconds)"
+        let time: String
+        if hours > 0 {
+            let paddedMinutes = minutes < 10 ? "0\(minutes)" : "\(minutes)"
+            time = "\(hours):\(paddedMinutes):\(paddedSeconds)"
+        } else {
+            time = "\(minutes):\(paddedSeconds)"
+        }
+        return hundredths ? time + fraction(attoseconds) : time
+    }
+
+    /// The hundredths of a second in `attoseconds`, such as ".25".
+    static func fraction(_ attoseconds: Int64) -> String {
+        let hundredths = Int(attoseconds / 10_000_000_000_000_000)
+        return hundredths < 10 ? ".0\(hundredths)" : ".\(hundredths)"
+    }
+
+    /// A preset in words: whole minutes as "12 min", zero as "None", otherwise seconds.
+    public static func presetLabel(_ duration: Duration) -> String {
+        let seconds = Int(duration.components.seconds)
+        if seconds == 0 { return "None" }
+        return seconds % 60 == 0 ? "\(seconds / 60) min" : "\(seconds) s"
     }
 
     private static func state(session: Session, timeLeft: Duration?) -> State {
@@ -114,15 +139,15 @@ public struct SessionDisplay: Equatable, Sendable {
         let nextIndex = session.segmentIndex + 1
         let exercises = session.configuration.emomExercises
         guard nextIndex < session.segments.count else {
-            if exercises != nil { return "Last exercise" }
-            return session.configuration.roundUnit.map { "Last \($0.lowercased())" }
+            if exercises != nil { return "Final exercise" }
+            return session.configuration.roundUnit.map { "Final \($0.lowercased())" }
         }
         let next = session.segments[nextIndex]
         if let exercises, next.kind == .work, let duration = next.countdownDuration {
             let exercise = session.segments[..<nextIndex].filter { $0.kind == .work }.count % exercises + 1
-            return "Exercise \(exercise) \(format(duration))"
+            return "Next: Exercise \(exercise) · \(format(duration))"
         }
-        return next.countdownDuration.map { "\(next.kind.name) \(format($0))" } ?? next.kind.name
+        return "Next: " + (next.countdownDuration.map { "\(next.kind.name) \(format($0))" } ?? next.kind.name)
     }
 
     private static func fraction(_ part: Duration, of whole: Duration) -> Double {
@@ -143,6 +168,12 @@ extension Segment.Kind {
 }
 
 extension WorkoutConfiguration {
+    /// Whether times are shown to hundredths of a second: For Time only, where they separate close results.
+    public var showsHundredths: Bool {
+        guard case .forTime = self else { return false }
+        return true
+    }
+
     /// Whether the athlete counts AMRAP rounds, which also shows the undo control.
     public var countsRounds: Bool {
         guard case .amrap(_, _, _, true) = self else { return false }

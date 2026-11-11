@@ -22,7 +22,7 @@ A workout SHALL begin with the chosen get-ready countdown, unless get-ready is O
 - **THEN** the first phase begins immediately
 
 ### Requirement: Phase order for clock-driven workouts
-Timer, AMRAP, EMOM, Tabata and Intervals SHALL run their phases in order and move on automatically when each phase's time runs out. Rest SHALL occur only between work phases, never after the last one. EMOM windows within a round SHALL run back to back; with more than one exercise, EMOM SHALL rest between rounds, and with one exercise it SHALL run all windows back to back.
+Countdown, AMRAP, EMOM, Tabata and Intervals SHALL run their phases in order and move on automatically when each phase's time runs out. Rest SHALL occur only between work phases, never after the last one. EMOM windows within a round SHALL run back to back; with more than one exercise, EMOM SHALL rest between rounds, and with one exercise it SHALL run all windows back to back.
 
 #### Scenario: Intervals sequence
 - **WHEN** Intervals runs with 8 rounds, work 0:45 and rest 0:15
@@ -138,11 +138,15 @@ With round counting on, the app SHALL count rounds across all blocks and offer a
 - **THEN** undo has no effect
 
 ### Requirement: For Time splits
-For Time SHALL treat each main action as the end of a round and record the time taken for that round. Finish SHALL be a separate visible control so that recording a split cannot end the workout by accident.
+For Time SHALL treat each main action as the end of a round and record the time taken for that round, to hundredths of a second. Finish SHALL be a separate visible control so that recording a split cannot end the workout by accident.
 
 #### Scenario: Recording a split
-- **WHEN** the user taps at 2:10 and again at 4:30
-- **THEN** the recorded round times are 2:10 and 2:20
+- **WHEN** the user taps at 2:10.25 and again at 4:30.50
+- **THEN** the recorded round times are 2:10.25 and 2:20.25
+
+#### Scenario: Hundredths are not rounded up
+- **WHEN** the user taps at 1:00.999
+- **THEN** the recorded time is 1:00.99
 
 ### Requirement: Leaving the app
 On iPad, a running workout SHALL pause automatically when the app leaves the foreground. On Mac, a running workout SHALL keep running on time when its window is covered or another app is active.
@@ -156,11 +160,15 @@ On iPad, a running workout SHALL pause automatically when the app leaves the for
 - **THEN** the workout keeps running and its phases change on time
 
 ### Requirement: Workout summary
-When a workout ends, the app SHALL show a summary with the workout time and any rounds or splits recorded, and offer to repeat the workout or return to setup. The summary SHALL NOT be saved.
+When a workout ends, the app SHALL show a summary with the workout time and any rounds or splits recorded, and offer to repeat the workout or return to setup. For For Time, the workout time and every split SHALL show hundredths of a second. The summary SHALL NOT be saved.
 
 #### Scenario: AMRAP summary
 - **WHEN** an AMRAP with counted rounds ends
 - **THEN** the summary shows the workout time and the rounds counted
+
+#### Scenario: For Time summary
+- **WHEN** a For Time workout is finished at 4:30.50 after splits of 2:10.25 and 2:20.25
+- **THEN** the summary shows 4:30.50 as the workout time and the splits 2:10.25 and 2:20.25
 
 #### Scenario: Repeating
 - **WHEN** the user chooses to repeat from the summary

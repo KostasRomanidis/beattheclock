@@ -2,10 +2,12 @@ import Observation
 import WorkoutEngine
 
 /// Connects a `Session` to real time: ticks every 100 ms and publishes what the screen shows.
+/// While For Time is running it ticks every 16 ms so the hundredths move smoothly.
 /// It holds no workout rules; inputs go straight to the session through `perform`.
 @Observable
 final class SessionController {
     static let tickInterval: Duration = .milliseconds(100)
+    static let hundredthsTickInterval: Duration = .milliseconds(16)
 
     private(set) var session: Session
     private(set) var display: SessionDisplay
@@ -27,8 +29,13 @@ final class SessionController {
         await cuePlayer.prepare()
         while !Task.isCancelled {
             tick()
-            try? await Task.sleep(for: Self.tickInterval)
+            try? await Task.sleep(for: interval)
         }
+    }
+
+    /// Fast only while hundredths are shown and moving; paused, get-ready and other workouts stay slow.
+    private var interval: Duration {
+        session.status == .running && display.mainFraction != nil ? Self.hundredthsTickInterval : Self.tickInterval
     }
 
     func perform(_ action: (inout Session, ContinuousClock.Instant) -> Void) {

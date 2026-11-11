@@ -15,12 +15,17 @@ struct SetupView: View {
                 Text(configuration.summary).font(.body)
             }
             Section {
-                Picker("Get ready", selection: $getReady) {
-                    ForEach(SetupLimits.getReadyPresets, id: \.self) { preset in
-                        Text(preset == .zero ? "Off" : "\(preset.components.seconds) s").tag(preset)
+                // A segmented picker hides its title, so the label is drawn above it.
+                VStack(alignment: .leading) {
+                    Text("Get ready")
+                    Picker("Get ready", selection: $getReady) {
+                        ForEach(SetupLimits.getReadyPresets, id: \.self) { preset in
+                            Text(preset == .zero ? "Off" : "\(preset.components.seconds) s").tag(preset)
+                        }
                     }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
                 }
-                .pickerStyle(.segmented)
             }
             Section {
                 Button(action: onStart) {
@@ -92,11 +97,16 @@ struct SetupView: View {
             }), presets: SetupLimits.roundPresets)
 
         case .forTime(let cap):
-            Toggle("Time cap", isOn: Binding(get: { cap != nil }, set: {
+            Toggle(isOn: Binding(get: { cap != nil }, set: {
                 configuration = .forTime(cap: $0 ? SetupLimits.defaultCap : nil)
-            }))
+            })) {
+                VStack(alignment: .leading) {
+                    Text("Time cap")
+                    if cap == nil { Text("No cap").font(.caption).foregroundStyle(.secondary) }
+                }
+            }
             if let cap {
-                DurationStepper("Cap", value: Binding(get: { cap }, set: { configuration = .forTime(cap: $0) }),
+                DurationStepper("Time cap", value: Binding(get: { cap }, set: { configuration = .forTime(cap: $0) }),
                                 presets: SetupLimits.capPresets)
             }
 
@@ -130,11 +140,12 @@ private struct DurationStepper: View {
         VStack(alignment: .leading) {
             // A nil action disables that button, so the limit is visible like the count steppers.
             Stepper(
-                label: { LabeledContent(title, value: SessionDisplay.format(value)) },
+                // Only a rest can reach zero, so zero always reads as no rest.
+                label: { LabeledContent(title, value: value == .zero ? "None" : SessionDisplay.format(value)) },
                 onIncrement: value < SetupLimits.maximumDuration ? { value = SetupLimits.stepUp(value) } : nil,
                 onDecrement: value > minimum ? { value = SetupLimits.stepDown(value, minimum: minimum) } : nil
             )
-            PresetRow(title: title, values: presets, selection: $value) { SessionDisplay.format($0) }
+            PresetRow(title: title, values: presets, selection: $value) { SessionDisplay.presetLabel($0) }
         }
     }
 }

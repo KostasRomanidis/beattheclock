@@ -295,6 +295,25 @@ private let sets = WorkoutConfiguration.sets(rest: .seconds(90), sets: 3)
         #expect(workout.status == .running)
     }
 
+    @Test func forTimeSplitsKeepHundredths() {
+        var workout = session(.forTime(cap: nil), getReady: 10)
+        _ = workout.update(at(10))
+
+        workout.tap(at(10 + 130.25))
+        workout.tap(at(10 + 270.5))
+
+        #expect(workout.splits.map { SessionDisplay.format($0, hundredths: true) } == ["2:10.25", "2:20.25"])
+        #expect(SessionDisplay.format(workout.workoutTime(at(10 + 270.5)), hundredths: true) == "4:30.50")
+    }
+
+    @Test func forTimeSplitHundredthsAreNotRoundedUp() {
+        var workout = session(.forTime(cap: nil))
+
+        workout.tap(at(60.999))
+
+        #expect(SessionDisplay.format(workout.splits[0], hundredths: true) == "1:00.99")
+    }
+
     @Test func finishEndsForTimeWithTheTimeReached() {
         var workout = session(.forTime(cap: nil))
 
