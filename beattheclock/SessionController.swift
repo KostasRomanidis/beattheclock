@@ -28,7 +28,8 @@ final class SessionController {
 
     /// Runs while the live view is showing; SwiftUI cancels it when the view goes away.
     func run() async {
-        await cuePlayer.prepare()
+        // Not awaited, so the clock counts from the first frame while audio sets up.
+        Task { [cuePlayer] in await cuePlayer.prepare() }
         while !Task.isCancelled {
             // Nothing moves on the summary; `restart` ticks again when the workout repeats.
             if session.status != .finished { tick() }
