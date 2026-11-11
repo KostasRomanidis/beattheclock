@@ -6,6 +6,8 @@ struct SetupView: View {
     @Binding var configuration: WorkoutConfiguration
     @Binding var getReady: Duration
     let onStart: () -> Void
+    /// The For Time cap to restore when its switch goes back on, for as long as this screen is open.
+    @State private var lastCap = SetupLimits.defaultCap
 
     var body: some View {
         Form {
@@ -97,8 +99,10 @@ struct SetupView: View {
             }), presets: SetupLimits.roundPresets)
 
         case .forTime(let cap):
+            // Switching the cap off keeps its value, so switching it back on restores it.
             Toggle(isOn: Binding(get: { cap != nil }, set: {
-                configuration = .forTime(cap: $0 ? SetupLimits.defaultCap : nil)
+                if !$0, let cap { lastCap = cap }
+                configuration = .forTime(cap: $0 ? lastCap : nil)
             })) {
                 VStack(alignment: .leading) {
                     Text("Time cap")
