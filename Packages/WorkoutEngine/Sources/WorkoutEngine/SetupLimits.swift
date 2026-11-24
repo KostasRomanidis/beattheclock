@@ -7,6 +7,11 @@ public enum SetupLimits {
     /// Rounds, blocks and sets.
     public static let counts: ClosedRange<Int> = 1...99
 
+    /// A count brought within `counts`, so the engine never builds an empty or oversized workout.
+    public static func clamp(_ count: Int) -> Int {
+        min(max(count, counts.lowerBound), counts.upperBound)
+    }
+
     public static let getReadyPresets: [Duration] = [.zero, .seconds(5), .seconds(10), .seconds(15), .seconds(30)]
     public static let defaultGetReady: Duration = .seconds(10)
     public static let defaultCap: Duration = .seconds(20 * 60)

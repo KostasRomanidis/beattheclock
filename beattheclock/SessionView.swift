@@ -9,8 +9,9 @@ struct SessionView: View {
 
     var body: some View {
         Group {
-            if controller.session.status == .finished {
-                SummaryView(session: controller.session, onRepeat: controller.restart, onExit: onExit)
+            // Reads `display`, the controller's only observed value, so the summary appears on finishing.
+            if controller.display.state == .finished {
+                SummaryView(name: controller.name, session: controller.session, onRepeat: controller.restart, onExit: onExit)
             } else {
                 LiveView(controller: controller)
             }
@@ -92,9 +93,10 @@ private struct LiveView: View {
         }
     }
 
+    // The hundredths are half the size of the time, and the whole number scales as one piece.
     private var mainNumber: some View {
-        Text(display.mainTime)
-            .font(.system(size: 1000, weight: .heavy, design: .rounded))
+        (Text(display.mainTime).font(.system(size: 1000, weight: .heavy, design: .rounded))
+            + Text(display.mainFraction ?? "").font(.system(size: 500, weight: .heavy, design: .rounded)))
             .monospacedDigit()
             .lineLimit(1)
             .minimumScaleFactor(0.01)
@@ -125,7 +127,7 @@ private struct LiveView: View {
                 Button("End Workout") { controller.perform { session, _ in session.endWorkout() } }
                 Button("Resume") { controller.perform { $0.resume($1) } }
             } else {
-                if session.configuration.countsRounds {
+                if session.plan.record == .rounds {
                     Button { controller.perform { session, _ in session.undoRound() } } label: {
                         Label("Undo last round", systemImage: "arrow.uturn.backward")
                     }
@@ -187,23 +189,28 @@ private struct Palette {
 }
 
 private struct SummaryView: View {
+    let name: String
     let session: Session
     let onRepeat: () -> Void
     let onExit: () -> Void
 
+    private func format(_ duration: Duration) -> String {
+        TimeFormat.format(duration, hundredths: session.plan.showsHundredths)
+    }
+
     var body: some View {
         VStack(spacing: 24) {
-            Text(session.configuration.name).font(.largeTitle.weight(.bold))
-            Text(SessionDisplay.format(session.workoutTime(.now)))
+            Text(name).font(.largeTitle.weight(.bold))
+            Text(format(session.workoutTime(.now)))
                 .font(.system(size: 96, weight: .heavy, design: .rounded))
                 .monospacedDigit()
-                .accessibilityLabel("Workout time \(SessionDisplay.format(session.workoutTime(.now)))")
+                .accessibilityLabel("Workout time \(format(session.workoutTime(.now)))")
             VStack(spacing: 8) {
-                if session.configuration.countsRounds {
+                if session.plan.record == .rounds {
                     LabeledContent("Rounds", value: "\(session.roundsCounted)")
                 }
                 ForEach(Array(session.splits.enumerated()), id: \.offset) { index, split in
-                    LabeledContent("Round \(index + 1)", value: SessionDisplay.format(split))
+                    LabeledContent("Round \(index + 1)", value: format(split))
                 }
             }
             .font(.title2)

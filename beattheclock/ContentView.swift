@@ -15,7 +15,8 @@ struct ContentView: View {
     @State private var getReady = SetupLimits.defaultGetReady
     @State private var path: [Int] = []
     @State private var controller: SessionController?
-    @State private var cuePlayer = CuePlayer()
+    /// Shared by every window, so the app runs one audio engine.
+    let cuePlayer: CuePlayer
 
     var body: some View {
         if let controller {
@@ -54,7 +55,7 @@ struct ContentView: View {
 extension WorkoutConfiguration {
     var name: String {
         switch self {
-        case .timer: "Timer"
+        case .countdown: "Countdown"
         case .amrap: "AMRAP"
         case .emom: "EMOM"
         case .tabata: "Tabata"
@@ -67,5 +68,5 @@ extension WorkoutConfiguration {
 }
 
 #Preview {
-    ContentView()
+    ContentView(cuePlayer: CuePlayer())
 }

@@ -1,27 +1,40 @@
-/// One workout type with its settings. Each type has exactly the settings its spec lists.
+/// One workout type with its settings. A closed list, so a new type fails to compile in every `switch`.
 public enum WorkoutConfiguration: Equatable, Sendable {
-    case timer(duration: Duration)
-    case amrap(block: Duration, blocks: Int, rest: Duration, countsRounds: Bool)
-    /// `rest` runs between rounds and applies only with more than one exercise.
-    case emom(window: Duration, exercises: Int, rounds: Int, rest: Duration)
-    case tabata(rounds: Int)
-    case intervals(work: Duration, rest: Duration, rounds: Int)
-    case forTime(cap: Duration?)
-    case stopwatch
-    case sets(rest: Duration, sets: Int)
-
-    public static let tabataWork: Duration = .seconds(20)
-    public static let tabataRest: Duration = .seconds(10)
+    case countdown(Countdown)
+    case amrap(Amrap)
+    case emom(Emom)
+    case tabata(Tabata)
+    case intervals(Intervals)
+    case forTime(ForTime)
+    case stopwatch(Stopwatch)
+    case sets(Sets)
 
     /// Every workout type with its default settings, in the order the app offers them.
+    /// The compiler does not check this list, so add a new type here too.
     public static let defaults: [WorkoutConfiguration] = [
-        .timer(duration: .seconds(5 * 60)),
-        .amrap(block: .seconds(12 * 60), blocks: 1, rest: .seconds(60), countsRounds: true),
-        .emom(window: .seconds(60), exercises: 1, rounds: 10, rest: .seconds(60)),
-        .tabata(rounds: 8),
-        .intervals(work: .seconds(40), rest: .seconds(20), rounds: 8),
-        .forTime(cap: nil),
-        .stopwatch,
-        .sets(rest: .seconds(90), sets: 5),
+        .countdown(Countdown()),
+        .amrap(Amrap()),
+        .emom(Emom()),
+        .tabata(Tabata()),
+        .intervals(Intervals()),
+        .forTime(ForTime()),
+        .stopwatch(Stopwatch()),
+        .sets(Sets()),
     ]
+
+    public func plan() -> WorkoutPlan {
+        switch self {
+        case .countdown(let workout): workout.plan()
+        case .amrap(let workout): workout.plan()
+        case .emom(let workout): workout.plan()
+        case .tabata(let workout): workout.plan()
+        case .intervals(let workout): workout.plan()
+        case .forTime(let workout): workout.plan()
+        case .stopwatch(let workout): workout.plan()
+        case .sets(let workout): workout.plan()
+        }
+    }
+
+    /// The calculated total, or nil when the athlete decides when a phase ends.
+    public var total: Duration? { plan().total }
 }

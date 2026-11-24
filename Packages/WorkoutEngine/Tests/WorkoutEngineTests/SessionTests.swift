@@ -12,7 +12,7 @@ private func minutes(_ minutes: Int, _ seconds: Int = 0) -> Duration {
 }
 
 private func session(_ configuration: WorkoutConfiguration, getReady: Int = 0) -> Session {
-    Session(configuration: configuration, getReady: .seconds(getReady), startingAt: start)
+    Session(plan: configuration.plan(), getReady: .seconds(getReady), startingAt: start)
 }
 
 /// Updates every 100 ms like the app does, returning each cue with the second it was reported.
@@ -27,9 +27,9 @@ private func run(_ session: inout Session, from: Double, to: Double) -> [(Double
     return cues
 }
 
-private let intervals = WorkoutConfiguration.intervals(work: .seconds(45), rest: .seconds(15), rounds: 8)
-private let amrap = WorkoutConfiguration.amrap(block: .seconds(300), blocks: 3, rest: .seconds(60), countsRounds: true)
-private let sets = WorkoutConfiguration.sets(rest: .seconds(90), sets: 3)
+private let intervals = WorkoutConfiguration.intervals(Intervals(work: .seconds(45), rest: .seconds(15), rounds: 8))
+private let amrap = WorkoutConfiguration.amrap(Amrap(block: .seconds(300), blocks: 3, rest: .seconds(60), countsRounds: true))
+private let sets = WorkoutConfiguration.sets(Sets(rest: .seconds(90), sets: 3))
 
 @Suite struct PhaseAdvance {
     @Test func getReadyCountsDownThenTheFirstPhaseBegins() {
@@ -39,7 +39,7 @@ private let sets = WorkoutConfiguration.sets(rest: .seconds(90), sets: 3)
         #expect(workout.isInGetReady)
 
         _ = workout.update(at(10))
-        #expect(workout.currentSegment.kind == .work)
+        #expect(workout.currentPhase.kind == .work)
         #expect(workout.workoutTime(at(10)) == .zero)
     }
 
@@ -54,8 +54,8 @@ private let sets = WorkoutConfiguration.sets(rest: .seconds(90), sets: 3)
     @Test func getReadyOffStartsTheFirstPhaseImmediately() {
         let workout = session(intervals)
 
-        #expect(workout.currentSegment.kind == .work)
-        #expect(workout.timeLeftInSegment(at(0)) == .seconds(45))
+        #expect(workout.currentPhase.kind == .work)
+        #expect(workout.timeLeftInPhase(at(0)) == .seconds(45))
     }
 
     @Test func skippingGetReadyStartsTheFirstPhaseNow() {
@@ -63,18 +63,18 @@ private let sets = WorkoutConfiguration.sets(rest: .seconds(90), sets: 3)
 
         workout.skipGetReady(at(3))
 
-        #expect(workout.currentSegment.kind == .work)
-        #expect(workout.timeLeftInSegment(at(3)) == .seconds(45))
+        #expect(workout.currentPhase.kind == .work)
+        #expect(workout.timeLeftInPhase(at(3)) == .seconds(45))
         #expect(workout.workoutTime(at(3)) == .zero)
     }
 
     @Test func phasesRunInOrderAndEndAfterTheLastWorkPhase() {
-        var workout = session(.intervals(work: .seconds(45), rest: .seconds(15), rounds: 2))
-        var kinds: [Segment.Kind] = [workout.currentSegment.kind]
+        var workout = session(.intervals(Intervals(work: .seconds(45), rest: .seconds(15), rounds: 2)))
+        var kinds: [Phase.Kind] = [workout.currentPhase.kind]
 
         for second in [44.9, 45, 59.9, 60, 104.9] {
             _ = workout.update(at(second))
-            kinds.append(workout.currentSegment.kind)
+            kinds.append(workout.currentPhase.kind)
         }
         #expect(kinds == [.work, .work, .rest, .rest, .work, .work])
         #expect(workout.status == .running)
@@ -86,17 +86,17 @@ private let sets = WorkoutConfiguration.sets(rest: .seconds(90), sets: 3)
 
     @Test func oneUpdateCanPassSeveralBoundaries() {
         // work 0-10, rest 10-15, work 15-25, rest 25-30, work 30-40
-        var workout = session(.intervals(work: .seconds(10), rest: .seconds(5), rounds: 3))
+        var workout = session(.intervals(Intervals(work: .seconds(10), rest: .seconds(5), rounds: 3)))
 
         _ = workout.update(at(27))
 
-        #expect(workout.segmentIndex == 3)
-        #expect(workout.currentSegment.kind == .rest)
-        #expect(workout.elapsedInSegment(at(27)) == .seconds(2))
+        #expect(workout.phaseIndex == 3)
+        #expect(workout.currentPhase.kind == .rest)
+        #expect(workout.elapsedInPhase(at(27)) == .seconds(2))
     }
 
     @Test func fortyMinuteWorkoutEndsExactlyOnTime() {
-        var workout = session(.emom(window: .seconds(60), exercises: 1, rounds: 40, rest: .seconds(60)))
+        var workout = session(.emom(Emom(window: .seconds(60), exercises: 1, rounds: 40, rest: .seconds(60))))
 
         _ = run(&workout, from: 0, to: 2399.9)
         #expect(workout.status == .running)
@@ -112,9 +112,9 @@ private let sets = WorkoutConfiguration.sets(rest: .seconds(90), sets: 3)
 
         _ = workout.update(at(125))
 
-        #expect(workout.segmentIndex == 2)
-        #expect(workout.timeLeftInSegment(at(125)) == nil)
-        #expect(workout.elapsedInSegment(at(125)) == .seconds(5))
+        #expect(workout.phaseIndex == 2)
+        #expect(workout.timeLeftInPhase(at(125)) == nil)
+        #expect(workout.elapsedInPhase(at(125)) == .seconds(5))
     }
 }
 
@@ -123,16 +123,16 @@ private let sets = WorkoutConfiguration.sets(rest: .seconds(90), sets: 3)
         // Round 3 work starts at 2:00, so 0:37 is left at 2:08.
         var workout = session(intervals)
         _ = workout.update(at(128))
-        #expect(workout.timeLeftInSegment(at(128)) == .seconds(37))
+        #expect(workout.timeLeftInPhase(at(128)) == .seconds(37))
 
         workout.pause(at(128))
         _ = workout.update(at(248))
-        #expect(workout.timeLeftInSegment(at(248)) == .seconds(37))
+        #expect(workout.timeLeftInPhase(at(248)) == .seconds(37))
 
         workout.resume(at(248))
         _ = workout.update(at(248))
-        #expect(workout.segmentIndex == 4)
-        #expect(workout.timeLeftInSegment(at(248)) == .seconds(37))
+        #expect(workout.phaseIndex == 4)
+        #expect(workout.timeLeftInPhase(at(248)) == .seconds(37))
         #expect(workout.workoutTime(at(248)) == minutes(2, 8))
     }
 
@@ -143,7 +143,7 @@ private let sets = WorkoutConfiguration.sets(rest: .seconds(90), sets: 3)
         _ = workout.update(at(60))
 
         #expect(workout.isInGetReady)
-        #expect(workout.timeLeftInSegment(at(60)) == .seconds(6))
+        #expect(workout.timeLeftInPhase(at(60)) == .seconds(6))
     }
 
     @Test func endingEarlyKeepsTheWorkoutTimeReached() {
@@ -170,7 +170,7 @@ private let sets = WorkoutConfiguration.sets(rest: .seconds(90), sets: 3)
         workout.tap(at(2))
 
         #expect(workout.status == .running)
-        #expect(workout.currentSegment.kind == .work)
+        #expect(workout.currentPhase.kind == .work)
     }
 
     @Test func spaceSkipsGetReadyInsteadOfPausing() {
@@ -179,7 +179,7 @@ private let sets = WorkoutConfiguration.sets(rest: .seconds(90), sets: 3)
         workout.togglePause(at(2))
 
         #expect(workout.status == .running)
-        #expect(workout.currentSegment.kind == .work)
+        #expect(workout.currentPhase.kind == .work)
     }
 
     @Test func tapWithNoMainActionPausesAndResumes() {
@@ -190,7 +190,7 @@ private let sets = WorkoutConfiguration.sets(rest: .seconds(90), sets: 3)
 
         workout.tap(at(9))
         #expect(workout.status == .running)
-        #expect(workout.timeLeftInSegment(at(9)) == .seconds(40))
+        #expect(workout.timeLeftInPhase(at(9)) == .seconds(40))
     }
 }
 
@@ -261,7 +261,7 @@ private let sets = WorkoutConfiguration.sets(rest: .seconds(90), sets: 3)
 
         workout.tap(at(370))
 
-        #expect(workout.segmentIndex == 2)
+        #expect(workout.phaseIndex == 2)
         #expect(workout.roundsCounted == 2)
     }
 
@@ -276,7 +276,7 @@ private let sets = WorkoutConfiguration.sets(rest: .seconds(90), sets: 3)
     }
 
     @Test func tapPausesWhenRoundCountingIsOff() {
-        var workout = session(.amrap(block: .seconds(300), blocks: 1, rest: .seconds(60), countsRounds: false))
+        var workout = session(.amrap(Amrap(block: .seconds(300), blocks: 1, rest: .seconds(60), countsRounds: false)))
 
         workout.tap(at(30))
 
@@ -285,7 +285,7 @@ private let sets = WorkoutConfiguration.sets(rest: .seconds(90), sets: 3)
     }
 
     @Test func forTimeRecordsEachRoundsTime() {
-        var workout = session(.forTime(cap: nil), getReady: 10)
+        var workout = session(.forTime(ForTime(cap: nil)), getReady: 10)
         _ = workout.update(at(10))
 
         workout.tap(at(10 + 130))
@@ -295,8 +295,27 @@ private let sets = WorkoutConfiguration.sets(rest: .seconds(90), sets: 3)
         #expect(workout.status == .running)
     }
 
+    @Test func forTimeSplitsKeepHundredths() {
+        var workout = session(.forTime(ForTime(cap: nil)), getReady: 10)
+        _ = workout.update(at(10))
+
+        workout.tap(at(10 + 130.25))
+        workout.tap(at(10 + 270.5))
+
+        #expect(workout.splits.map { TimeFormat.format($0, hundredths: true) } == ["2:10.25", "2:20.25"])
+        #expect(TimeFormat.format(workout.workoutTime(at(10 + 270.5)), hundredths: true) == "4:30.50")
+    }
+
+    @Test func forTimeSplitHundredthsAreNotRoundedUp() {
+        var workout = session(.forTime(ForTime(cap: nil)))
+
+        workout.tap(at(60.999))
+
+        #expect(TimeFormat.format(workout.splits[0], hundredths: true) == "1:00.99")
+    }
+
     @Test func finishEndsForTimeWithTheTimeReached() {
-        var workout = session(.forTime(cap: nil))
+        var workout = session(.forTime(ForTime(cap: nil)))
 
         workout.finish(at(270))
 
@@ -305,7 +324,7 @@ private let sets = WorkoutConfiguration.sets(rest: .seconds(90), sets: 3)
     }
 
     @Test func finishEndsStopwatch() {
-        var workout = session(.stopwatch)
+        var workout = session(.stopwatch(Stopwatch()))
 
         workout.finish(at(12))
 
@@ -321,7 +340,7 @@ private let sets = WorkoutConfiguration.sets(rest: .seconds(90), sets: 3)
     }
 
     @Test func forTimeEndsAtItsCap() {
-        var workout = session(.forTime(cap: minutes(20)))
+        var workout = session(.forTime(ForTime(cap: minutes(20))))
 
         _ = workout.update(at(1199.9))
         #expect(workout.status == .running)
@@ -336,12 +355,12 @@ private let sets = WorkoutConfiguration.sets(rest: .seconds(90), sets: 3)
 
         workout.mainAction(at(40))
 
-        #expect(workout.currentSegment.kind == .rest)
-        #expect(workout.timeLeftInSegment(at(40)) == minutes(1, 30))
+        #expect(workout.currentPhase.kind == .rest)
+        #expect(workout.timeLeftInPhase(at(40)) == minutes(1, 30))
     }
 
     @Test func markingTheLastSetDoneEndsTheWorkout() {
-        var workout = session(.sets(rest: .seconds(90), sets: 1))
+        var workout = session(.sets(Sets(rest: .seconds(90), sets: 1)))
 
         workout.tap(at(40))
 
@@ -355,14 +374,14 @@ private let sets = WorkoutConfiguration.sets(rest: .seconds(90), sets: 3)
 
         workout.mainAction(at(50))
 
-        #expect(workout.segmentIndex == 1)
+        #expect(workout.phaseIndex == 1)
         #expect(workout.availableAction == nil)
     }
 }
 
 @Suite struct Cues {
     @Test func ticksPlayOnceAtThreeTwoAndOneSecondsLeft() {
-        var workout = session(.timer(duration: .seconds(10)))
+        var workout = session(.countdown(Countdown(duration: .seconds(10))))
 
         let cues = run(&workout, from: 0, to: 12)
 
@@ -371,7 +390,7 @@ private let sets = WorkoutConfiguration.sets(rest: .seconds(90), sets: 3)
     }
 
     @Test func getReadyTicksThenWorkStarts() {
-        var workout = session(.timer(duration: .seconds(60)), getReady: 10)
+        var workout = session(.countdown(Countdown(duration: .seconds(60))), getReady: 10)
 
         let cues = run(&workout, from: 0, to: 10)
 
@@ -380,7 +399,7 @@ private let sets = WorkoutConfiguration.sets(rest: .seconds(90), sets: 3)
     }
 
     @Test func workAndRestStartsHaveTheirOwnSounds() {
-        var workout = session(.intervals(work: .seconds(5), rest: .seconds(5), rounds: 2))
+        var workout = session(.intervals(Intervals(work: .seconds(5), rest: .seconds(5), rounds: 2)))
 
         let cues = run(&workout, from: 0, to: 16).map(\.1).filter { $0 != .tick }
 
@@ -388,7 +407,7 @@ private let sets = WorkoutConfiguration.sets(rest: .seconds(90), sets: 3)
     }
 
     @Test func eachEmomExercisePlaysTheWorkSoundAndRoundsRest() {
-        var workout = session(.emom(window: .seconds(5), exercises: 2, rounds: 2, rest: .seconds(5)))
+        var workout = session(.emom(Emom(window: .seconds(5), exercises: 2, rounds: 2, rest: .seconds(5))))
 
         let cues = run(&workout, from: 0, to: 26).map(\.1).filter { $0 != .tick }
 
@@ -406,7 +425,7 @@ private let sets = WorkoutConfiguration.sets(rest: .seconds(90), sets: 3)
     }
 
     @Test func finishingByHandPlaysTheFinishSound() {
-        var workout = session(.stopwatch)
+        var workout = session(.stopwatch(Stopwatch()))
         _ = workout.update(at(0))
 
         workout.finish(at(20))
@@ -414,8 +433,18 @@ private let sets = WorkoutConfiguration.sets(rest: .seconds(90), sets: 3)
         #expect(workout.update(at(20.1)) == [.finish])
     }
 
+    @Test func endingFromAPausePlaysNoSound() {
+        var workout = session(intervals)
+        _ = workout.update(at(0))
+        workout.pause(at(20))
+
+        workout.endWorkout()
+
+        #expect(workout.update(at(20.1)) == [])
+    }
+
     @Test func ticksResumeAfterAPauseWithoutRepeating() {
-        var workout = session(.timer(duration: .seconds(10)))
+        var workout = session(.countdown(Countdown(duration: .seconds(10))))
         let before = run(&workout, from: 0, to: 7.5)
 
         workout.pause(at(7.5))
@@ -430,7 +459,7 @@ private let sets = WorkoutConfiguration.sets(rest: .seconds(90), sets: 3)
     }
 
     @Test func skippedGetReadyPlaysNoTicks() {
-        var workout = session(.timer(duration: .seconds(60)), getReady: 10)
+        var workout = session(.countdown(Countdown(duration: .seconds(60))), getReady: 10)
         _ = run(&workout, from: 0, to: 5)
 
         workout.tap(at(5))
@@ -440,7 +469,7 @@ private let sets = WorkoutConfiguration.sets(rest: .seconds(90), sets: 3)
     }
 
     @Test func cuesPassedDuringALongStallAreDropped() {
-        var workout = session(.timer(duration: .seconds(10)))
+        var workout = session(.countdown(Countdown(duration: .seconds(10))))
         _ = workout.update(at(0))
 
         #expect(workout.update(at(12)) == [])
@@ -449,9 +478,111 @@ private let sets = WorkoutConfiguration.sets(rest: .seconds(90), sets: 3)
 
     @Test func aCueLessThanASecondLateStillPlays() {
         // work 0-10, rest 10-15, work 15-25, rest 25-30
-        var workout = session(.intervals(work: .seconds(10), rest: .seconds(5), rounds: 3))
+        var workout = session(.intervals(Intervals(work: .seconds(10), rest: .seconds(5), rounds: 3)))
         _ = workout.update(at(0))
 
         #expect(workout.update(at(25.5)) == [.restStart])
+    }
+}
+
+@Suite struct SessionSetup {
+    @Test func invalidCountsWithNoGetReadyDoNotCrash() {
+        var workout = session(.emom(Emom(window: .seconds(60), exercises: 0, rounds: 0, rest: .zero)))
+
+        #expect(workout.plan.phases.count == 1)
+        _ = workout.update(at(61))
+        #expect(workout.status == .finished)
+    }
+
+    @Test func totalExcludesGetReady() {
+        let intervals = WorkoutConfiguration.intervals(Intervals(work: .seconds(45), rest: .seconds(15), rounds: 8))
+
+        #expect(session(intervals, getReady: 10).plan.total == intervals.total)
+        #expect(session(.stopwatch(Stopwatch())).plan.total == nil)
+    }
+}
+
+@Suite struct LateInput {
+    @Test func finishAfterTheCapEndsAtTheCap() {
+        var workout = session(.forTime(ForTime(cap: .seconds(20))))
+        _ = workout.update(at(19.99))
+
+        workout.tap(at(20.5))
+        workout.finish(at(20.6))
+
+        #expect(workout.status == .finished)
+        #expect(workout.splits.isEmpty)
+        #expect(workout.workoutTime(at(30)) == .seconds(20))
+    }
+
+    @Test func aRoundTappedAfterTheLastBlockIsNotCounted() {
+        var workout = session(.amrap(Amrap(block: .seconds(10))))
+        _ = workout.update(at(9.95))
+
+        workout.mainAction(at(10.04))
+
+        #expect(workout.status == .finished)
+        #expect(workout.roundsCounted == 0)
+    }
+
+    @Test func tapAfterARestEndsMarksTheNewSetDone() {
+        var workout = session(sets)
+        workout.mainAction(at(30))
+        _ = workout.update(at(119.95))
+
+        workout.tap(at(120.04))
+
+        #expect(workout.status == .running)
+        #expect(workout.phaseIndex == 3)
+    }
+
+    @Test func pausingHoldingOrSpaceAfterTheEndLeavesTheWorkoutFinished() {
+        let controls: [(inout Session) -> Void] = [
+            { $0.pause(at(12)) }, { $0.hold(at(12)) }, { $0.togglePause(at(12)) },
+        ]
+        for control in controls {
+            var workout = session(.countdown(Countdown(duration: .seconds(10))))
+            control(&workout)
+            #expect(workout.status == .finished)
+            #expect(workout.workoutTime(at(50)) == .seconds(10))
+        }
+    }
+
+    @Test func skippingGetReadyAfterItEndsKeepsItsEnd() {
+        var workout = session(intervals, getReady: 10)
+
+        workout.skipGetReady(at(10.5))
+
+        #expect(workout.workoutTime(at(10.5)) == .milliseconds(500))
+    }
+}
+
+@Suite struct EndingWithCuesWaiting {
+    @Test func endingFromAPauseDropsCuesNotYetReported() {
+        var workout = session(intervals)
+        workout.pause(at(0.1))
+
+        workout.endWorkout()
+
+        #expect(workout.update(at(0.5)) == [])
+    }
+
+    @Test func aFinishReportedTooLateIsDropped() {
+        var workout = session(.stopwatch(Stopwatch()))
+        _ = workout.update(at(0))
+
+        workout.finish(at(20))
+
+        #expect(workout.update(at(25)) == [])
+    }
+
+    @Test func aCuePassedJustBeforeAPausePlaysAfterIt() {
+        var workout = session(.countdown(Countdown(duration: .seconds(10))))
+        _ = workout.update(at(6.95))
+        workout.pause(at(7.05))
+
+        workout.resume(at(60))
+
+        #expect(workout.update(at(60)) == [.tick])
     }
 }

@@ -8,7 +8,7 @@ private func at(_ seconds: Double) -> Session.Instant {
 }
 
 private func session(_ configuration: WorkoutConfiguration, getReady: Int = 0) -> Session {
-    Session(configuration: configuration, getReady: .seconds(getReady), startingAt: start)
+    Session(plan: configuration.plan(), getReady: .seconds(getReady), startingAt: start)
 }
 
 /// The display after updating the session to `seconds`.
@@ -17,28 +17,73 @@ private func display(_ session: inout Session, at seconds: Double) -> SessionDis
     return SessionDisplay(session: session, now: at(seconds))
 }
 
-private let intervals = WorkoutConfiguration.intervals(work: .seconds(45), rest: .seconds(15), rounds: 8)
-private let sets = WorkoutConfiguration.sets(rest: .seconds(90), sets: 5)
+private let intervals = WorkoutConfiguration.intervals(Intervals(work: .seconds(45), rest: .seconds(15), rounds: 8))
+private let sets = WorkoutConfiguration.sets(Sets(rest: .seconds(90), sets: 5))
 // Rounds start at 0, 6:00 and 12:00, with rests at 5:00 and 11:00.
-private let circuit = WorkoutConfiguration.emom(window: .seconds(60), exercises: 5, rounds: 3, rest: .seconds(60))
+private let circuit = WorkoutConfiguration.emom(Emom(window: .seconds(60), exercises: 5, rounds: 3, rest: .seconds(60)))
 
-@Suite struct TimeFormat {
+@Suite struct TimeFormats {
     @Test func underAnHourShowsMinutesAndSeconds() {
-        #expect(SessionDisplay.format(.seconds(45)) == "0:45")
-        #expect(SessionDisplay.format(.seconds(12 * 60)) == "12:00")
+        #expect(TimeFormat.format(.seconds(45)) == "0:45")
+        #expect(TimeFormat.format(.seconds(12 * 60)) == "12:00")
     }
 
     @Test func overAnHourAddsHours() {
-        #expect(SessionDisplay.format(.seconds(3600 + 2 * 60 + 5)) == "1:02:05")
+        #expect(TimeFormat.format(.seconds(3600 + 2 * 60 + 5)) == "1:02:05")
     }
 
     @Test func countdownShowsTheLastSecondAsOne() {
-        #expect(SessionDisplay.format(.milliseconds(400), roundingUp: true) == "0:01")
-        #expect(SessionDisplay.format(.zero, roundingUp: true) == "0:00")
+        #expect(TimeFormat.format(.milliseconds(400), roundingUp: true) == "0:01")
+        #expect(TimeFormat.format(.zero, roundingUp: true) == "0:00")
     }
 
     @Test func elapsedTimeRoundsDown() {
-        #expect(SessionDisplay.format(.milliseconds(59_900)) == "0:59")
+        #expect(TimeFormat.format(.milliseconds(59_900)) == "0:59")
+    }
+
+    @Test func hundredthsAreCutOffNotRounded() {
+        #expect(TimeFormat.format(.milliseconds(130_679), hundredths: true) == "2:10.67")
+        #expect(TimeFormat.format(.milliseconds(59_996), hundredths: true) == "0:59.99")
+    }
+
+    @Test func hundredthsAreAlwaysTwoDigits() {
+        #expect(TimeFormat.format(.seconds(240), hundredths: true) == "4:00.00")
+        #expect(TimeFormat.format(.milliseconds(5_050), hundredths: true) == "0:05.05")
+    }
+
+    @Test func hundredthsComeAfterHours() {
+        #expect(TimeFormat.format(.milliseconds((3600 + 2 * 60 + 5) * 1000 + 500), hundredths: true) == "1:02:05.50")
+    }
+}
+
+@Suite struct PresetLabels {
+    @Test func wholeMinutesReadInMinutes() {
+        #expect(TimeFormat.presetLabel(.seconds(12 * 60)) == "12 min")
+        #expect(TimeFormat.presetLabel(.seconds(60)) == "1 min")
+    }
+
+    @Test func otherTimesReadInSeconds() {
+        #expect(TimeFormat.presetLabel(.seconds(20)) == "20 s")
+        #expect(TimeFormat.presetLabel(.seconds(90)) == "90 s")
+    }
+
+    @Test func zeroReadsNone() {
+        #expect(TimeFormat.presetLabel(.zero) == "None")
+    }
+
+    @Test func everyDurationPresetReadsAsWords() {
+        let presets = SetupLimits.durationPresets + SetupLimits.capPresets + SetupLimits.windowPresets
+            + SetupLimits.workPresets + SetupLimits.restPresets + SetupLimits.longRestPresets
+        for preset in presets {
+            let label = TimeFormat.presetLabel(preset)
+            #expect(label == "None" || label.hasSuffix(" min") || label.hasSuffix(" s"))
+            #expect(!label.contains(":"))
+        }
+    }
+
+    @Test func intervalsPresetsMatchTheSpec() {
+        #expect(SetupLimits.workPresets.map(TimeFormat.presetLabel) == ["20 s", "30 s", "40 s", "45 s", "1 min", "2 min"])
+        #expect(SetupLimits.restPresets.map(TimeFormat.presetLabel) == ["None", "10 s", "15 s", "20 s", "30 s", "1 min"])
     }
 }
 
@@ -50,7 +95,7 @@ private let circuit = WorkoutConfiguration.emom(window: .seconds(60), exercises:
     }
 
     @Test func forTimeShowsTimeSoFar() {
-        var workout = session(.forTime(cap: nil))
+        var workout = session(.forTime(ForTime(cap: nil)))
 
         #expect(display(&workout, at: 270).mainTime == "4:30")
     }
@@ -69,6 +114,38 @@ private let circuit = WorkoutConfiguration.emom(window: .seconds(60), exercises:
 
         #expect(display(&workout, at: 0.5).mainTime == "0:10")
     }
+
+    @Test func forTimeAddsHundredthsAfterWholeSeconds() {
+        var workout = session(.forTime(ForTime(cap: nil)))
+
+        let screen = display(&workout, at: 270.25)
+
+        #expect(screen.mainTime == "4:30")
+        #expect(screen.mainFraction == ".25")
+    }
+
+    @Test func stopwatchStaysInWholeSeconds() {
+        var workout = session(.stopwatch(Stopwatch()))
+
+        let screen = display(&workout, at: 270.25)
+
+        #expect(screen.mainTime == "4:30")
+        #expect(screen.mainFraction == nil)
+    }
+
+    @Test func forTimeGetReadyHasNoHundredths() {
+        var workout = session(.forTime(ForTime(cap: nil)), getReady: 10)
+
+        #expect(display(&workout, at: 0.5).mainFraction == nil)
+    }
+
+    @Test func countdownsAndSetsHaveNoHundredths() {
+        var intervalsWork = session(intervals)
+        var setsWork = session(sets)
+
+        #expect(display(&intervalsWork, at: 8.25).mainFraction == nil)
+        #expect(display(&setsWork, at: 25.25).mainFraction == nil)
+    }
 }
 
 @Suite struct SecondaryTotal {
@@ -83,24 +160,24 @@ private let circuit = WorkoutConfiguration.emom(window: .seconds(60), exercises:
     }
 
     @Test func tabataAndEmomShowTotalLeft() {
-        var tabata = session(.tabata(rounds: 8))
-        var emom = session(.emom(window: .seconds(60), exercises: 1, rounds: 10, rest: .seconds(60)))
+        var tabata = session(.tabata(Tabata(rounds: 8)))
+        var emom = session(.emom(Emom(window: .seconds(60), exercises: 1, rounds: 10, rest: .seconds(60))))
 
         #expect(display(&tabata, at: 0).secondaryTotal == "3:50 left")
         #expect(display(&emom, at: 90).secondaryTotal == "8:30 left")
     }
 
     @Test func amrapShowsTotalLeftOnlyWithSeveralBlocks() {
-        var single = session(.amrap(block: .seconds(720), blocks: 1, rest: .seconds(60), countsRounds: true))
-        var blocks = session(.amrap(block: .seconds(300), blocks: 3, rest: .seconds(60), countsRounds: true))
+        var single = session(.amrap(Amrap(block: .seconds(720), blocks: 1, rest: .seconds(60), countsRounds: true)))
+        var blocks = session(.amrap(Amrap(block: .seconds(300), blocks: 3, rest: .seconds(60), countsRounds: true)))
 
         #expect(display(&single, at: 0).secondaryTotal == nil)
         #expect(display(&blocks, at: 0).secondaryTotal == "17:00 left")
     }
 
     @Test func forTimeShowsCapLeftOnlyWithACap() {
-        var capped = session(.forTime(cap: .seconds(20 * 60)))
-        var uncapped = session(.forTime(cap: nil))
+        var capped = session(.forTime(ForTime(cap: .seconds(20 * 60))))
+        var uncapped = session(.forTime(ForTime(cap: nil)))
 
         #expect(display(&capped, at: 270).secondaryTotal == "15:30 left")
         #expect(display(&uncapped, at: 270).secondaryTotal == nil)
@@ -112,9 +189,15 @@ private let circuit = WorkoutConfiguration.emom(window: .seconds(60), exercises:
         #expect(display(&workout, at: 720).secondaryTotal == "12:00 elapsed")
     }
 
+    @Test func capLeftStaysInWholeSeconds() {
+        var workout = session(.forTime(ForTime(cap: .seconds(20 * 60))))
+
+        #expect(display(&workout, at: 12 * 60 + 10.4).secondaryTotal == "7:50 left")
+    }
+
     @Test func timerAndStopwatchShowNoTotal() {
-        var timer = session(.timer(duration: .seconds(300)))
-        var stopwatch = session(.stopwatch)
+        var timer = session(.countdown(Countdown(duration: .seconds(300))))
+        var stopwatch = session(.stopwatch(Stopwatch()))
 
         #expect(display(&timer, at: 10).secondaryTotal == nil)
         #expect(display(&stopwatch, at: 10).secondaryTotal == nil)
@@ -141,7 +224,7 @@ private let circuit = WorkoutConfiguration.emom(window: .seconds(60), exercises:
     }
 
     @Test func singleExerciseEmomShowsOnlyTheRound() {
-        var workout = session(.emom(window: .seconds(60), exercises: 1, rounds: 10, rest: .seconds(60)))
+        var workout = session(.emom(Emom(window: .seconds(60), exercises: 1, rounds: 10, rest: .seconds(60))))
 
         #expect(display(&workout, at: 210).position == "Round 4 of 10")
     }
@@ -156,8 +239,8 @@ private let circuit = WorkoutConfiguration.emom(window: .seconds(60), exercises:
     }
 
     @Test func amrapShowsBlockAndRoundsCounted() {
-        var blocks = session(.amrap(block: .seconds(300), blocks: 3, rest: .seconds(60), countsRounds: true))
-        var single = session(.amrap(block: .seconds(720), blocks: 1, rest: .seconds(60), countsRounds: true))
+        var blocks = session(.amrap(Amrap(block: .seconds(300), blocks: 3, rest: .seconds(60), countsRounds: true)))
+        var single = session(.amrap(Amrap(block: .seconds(720), blocks: 1, rest: .seconds(60), countsRounds: true)))
         single.tap(at(30))
 
         #expect(display(&blocks, at: 10).position == "Block 1 of 3 · 0 rounds")
@@ -165,21 +248,29 @@ private let circuit = WorkoutConfiguration.emom(window: .seconds(60), exercises:
     }
 
     @Test func amrapWithoutCountingShowsOnlyTheBlock() {
-        var single = session(.amrap(block: .seconds(720), blocks: 1, rest: .seconds(60), countsRounds: false))
+        var single = session(.amrap(Amrap(block: .seconds(720), blocks: 1, rest: .seconds(60), countsRounds: false)))
 
         #expect(display(&single, at: 10).position == nil)
     }
 
     @Test func forTimeShowsTheRoundNumber() {
-        var workout = session(.forTime(cap: nil))
+        var workout = session(.forTime(ForTime(cap: nil)))
         workout.tap(at(130))
 
         #expect(display(&workout, at: 140).position == "Round 2")
     }
 
+    @Test func getReadyShowsTheFirstPlaceAsNext() {
+        var emom = session(circuit, getReady: 10)
+        var forTime = session(.forTime(ForTime(cap: nil)), getReady: 10)
+
+        #expect(display(&emom, at: 1).position == "Round 1 of 3 next")
+        #expect(display(&forTime, at: 1).position == "Round 1")
+    }
+
     @Test func timerAndStopwatchShowNoPosition() {
-        var timer = session(.timer(duration: .seconds(300)))
-        var stopwatch = session(.stopwatch)
+        var timer = session(.countdown(Countdown(duration: .seconds(300))))
+        var stopwatch = session(.stopwatch(Stopwatch()))
 
         #expect(display(&timer, at: 10).position == nil)
         #expect(display(&stopwatch, at: 10).position == nil)
@@ -190,55 +281,55 @@ private let circuit = WorkoutConfiguration.emom(window: .seconds(60), exercises:
     @Test func workIsFollowedByRest() {
         var workout = session(intervals)
 
-        #expect(display(&workout, at: 10).nextPhase == "Rest 0:15")
+        #expect(display(&workout, at: 10).nextPhase == "Next: Rest 0:15")
     }
 
     @Test func restIsFollowedByWork() {
         var workout = session(intervals)
 
-        #expect(display(&workout, at: 50).nextPhase == "Work 0:45")
+        #expect(display(&workout, at: 50).nextPhase == "Next: Work 0:45")
     }
 
     @Test func getReadyIsFollowedByTheFirstPhase() {
         var workout = session(intervals, getReady: 10)
 
-        #expect(display(&workout, at: 1).nextPhase == "Work 0:45")
+        #expect(display(&workout, at: 1).nextPhase == "Next: Work 0:45")
     }
 
     @Test func emomNamesTheNextExercise() {
         var workout = session(circuit)
 
-        #expect(display(&workout, at: 570).nextPhase == "Exercise 5 1:00")
+        #expect(display(&workout, at: 570).nextPhase == "Next: Exercise 5 · 1:00")
     }
 
     @Test func emomRoundEndsWithRest() {
         var workout = session(circuit)
 
-        #expect(display(&workout, at: 630).nextPhase == "Rest 1:00")
+        #expect(display(&workout, at: 630).nextPhase == "Next: Rest 1:00")
     }
 
-    @Test func theLastEmomExerciseSaysSo() {
+    @Test func theFinalEmomExerciseSaysSo() {
         var workout = session(circuit)
 
-        #expect(display(&workout, at: 990).nextPhase == "Last exercise")
+        #expect(display(&workout, at: 990).nextPhase == "Final exercise")
     }
 
-    @Test func theLastWorkPhaseSaysSo() {
+    @Test func theFinalWorkPhaseSaysSo() {
         var workout = session(intervals)
 
-        #expect(display(&workout, at: 430).nextPhase == "Last round")
+        #expect(display(&workout, at: 430).nextPhase == "Final round")
     }
 
-    @Test func theLastSetSaysSo() {
-        var workout = session(.sets(rest: .seconds(90), sets: 1))
+    @Test func theFinalSetSaysSo() {
+        var workout = session(.sets(Sets(rest: .seconds(90), sets: 1)))
 
-        #expect(display(&workout, at: 10).nextPhase == "Last set")
+        #expect(display(&workout, at: 10).nextPhase == "Final set")
     }
 }
 
 @Suite struct StateAndProgress {
     @Test func stateFollowsThePhase() {
-        var workout = session(.intervals(work: .seconds(45), rest: .seconds(15), rounds: 2), getReady: 10)
+        var workout = session(.intervals(Intervals(work: .seconds(45), rest: .seconds(15), rounds: 2)), getReady: 10)
 
         #expect(display(&workout, at: 1).state == .getReady)
         #expect(display(&workout, at: 11).state == .work)
@@ -260,7 +351,7 @@ private let circuit = WorkoutConfiguration.emom(window: .seconds(60), exercises:
     }
 
     @Test func countUpPhasesHaveNoFinalSeconds() {
-        var workout = session(.stopwatch)
+        var workout = session(.stopwatch(Stopwatch()))
 
         #expect(display(&workout, at: 1).state == .work)
     }
@@ -282,30 +373,39 @@ private let circuit = WorkoutConfiguration.emom(window: .seconds(60), exercises:
     }
 
     @Test func halfwayThroughAPhaseIsHalfDrained() {
-        var workout = session(.timer(duration: .seconds(300)), getReady: 10)
+        var workout = session(.countdown(Countdown(duration: .seconds(300))), getReady: 10)
 
         #expect(display(&workout, at: 5).phaseProgress == 0.5)
         #expect(display(&workout, at: 160).phaseProgress == 0.5)
     }
 
     @Test func halfwayThroughAWorkoutFillsHalfTheBar() {
-        var workout = session(.emom(window: .seconds(60), exercises: 1, rounds: 10, rest: .seconds(60)))
+        var workout = session(.emom(Emom(window: .seconds(60), exercises: 1, rounds: 10, rest: .seconds(60))))
 
         #expect(display(&workout, at: 300).workoutProgress == 0.5)
     }
 
     @Test func getReadyLeavesTheWorkoutBarEmpty() {
-        var workout = session(.emom(window: .seconds(60), exercises: 1, rounds: 10, rest: .seconds(60)), getReady: 10)
+        var workout = session(.emom(Emom(window: .seconds(60), exercises: 1, rounds: 10, rest: .seconds(60))), getReady: 10)
 
         #expect(display(&workout, at: 5).workoutProgress == 0)
     }
 
     @Test func stopwatchHasNoBarOrDrain() {
-        var workout = session(.stopwatch)
+        var workout = session(.stopwatch(Stopwatch()))
 
         let screen = display(&workout, at: 30)
 
         #expect(screen.workoutProgress == nil)
         #expect(screen.phaseProgress == nil)
+    }
+
+    @Test func aZeroLengthWorkoutIsComplete() {
+        var workout = session(.countdown(Countdown(duration: .zero)))
+
+        let screen = display(&workout, at: 0)
+
+        #expect(screen.phaseProgress == 1)
+        #expect(screen.workoutProgress == 1)
     }
 }

@@ -1,6 +1,6 @@
 # Beat the Clock
 
-A workout timer for Mac and iPad, built to be read from across the room. It has eight workout types: Timer, AMRAP, EMOM, Tabata, Intervals, For Time, Stopwatch and Sets.
+A workout timer for Mac and iPad, built to be read from across the room. It has eight workout types: Countdown, AMRAP, EMOM, Tabata, Intervals, For Time, Stopwatch and Sets.
 
 ## Requirements
 

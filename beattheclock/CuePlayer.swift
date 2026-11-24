@@ -12,7 +12,7 @@ actor CuePlayer {
     private let engine = AVAudioEngine()
     private let player = AVAudioPlayerNode()
     private let buffers: [CueEvent: AVAudioPCMBuffer]
-    private var sessionReady = false
+    private var preparing: Task<Void, Never>?
 
     init() {
         let format = AVAudioFormat(standardFormatWithSampleRate: Self.sampleRate, channels: 1)!
@@ -26,12 +26,28 @@ actor CuePlayer {
         engine.connect(player, to: engine.mainMixerNode, format: format)
     }
 
-    /// Sets the category and activates the session once, before the first cue.
-    func prepare() async {
+    /// Starts setting up audio once, in the background: the session on iPad, then the engine,
+    /// so the first cue doesn't pay the start-up time. Cues wait for it instead of racing it.
+    func prepare() {
+        guard preparing == nil else { return }
+        preparing = Task { await setUp() }
+    }
+
+    func play(_ cue: CueEvent) async {
+        await preparing?.value
+        // The engine stops on audio route changes and interruptions, so restart it on demand.
+        guard startEngine(), let buffer = buffers[cue] else { return }
+        queue(buffer)
+    }
+
+    /// Queued without interrupting, so several cues from one tick play in order. Not async,
+    /// so this schedules the buffer rather than the async overload that awaits its playback.
+    private func queue(_ buffer: AVAudioPCMBuffer) {
+        player.scheduleBuffer(buffer, at: nil, completionHandler: nil)
+    }
+
+    private func setUp() async {
         #if os(iOS)
-        guard !sessionReady else { return }
-        // Set before the await so a call arriving during the suspension returns at once.
-        sessionReady = true
         let session = AVAudioSession.sharedInstance()
         // Playback ignores the silent setting; mixing keeps other apps' music playing.
         try? session.setCategory(.playback, options: .mixWithOthers)
@@ -41,16 +57,15 @@ actor CuePlayer {
             try? session.setActive(true)
         }
         #endif
+        startEngine()
     }
 
-    func play(_ cue: CueEvent) {
-        // The engine stops on audio route changes and interruptions, so restart it on demand.
-        if !engine.isRunning {
-            guard (try? engine.start()) != nil else { return }
-            player.play()
-        }
-        guard let buffer = buffers[cue] else { return }
-        player.scheduleBuffer(buffer, at: nil, options: .interrupts)
+    /// Whether the engine is running, starting it and the player if needed.
+    @discardableResult private func startEngine() -> Bool {
+        if engine.isRunning { return true }
+        guard (try? engine.start()) != nil else { return false }
+        player.play()
+        return true
     }
 
     /// Notes played one after another, each faded in and out to avoid clicks.
