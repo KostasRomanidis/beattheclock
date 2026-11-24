@@ -55,7 +55,7 @@ struct ContentView: View {
 extension WorkoutConfiguration {
     var name: String {
         switch self {
-        case .timer: "Countdown"
+        case .countdown: "Countdown"
         case .amrap: "AMRAP"
         case .emom: "EMOM"
         case .tabata: "Tabata"

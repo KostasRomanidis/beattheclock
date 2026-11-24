@@ -11,7 +11,7 @@ struct SessionView: View {
         Group {
             // Reads `display`, the controller's only observed value, so the summary appears on finishing.
             if controller.display.state == .finished {
-                SummaryView(session: controller.session, onRepeat: controller.restart, onExit: onExit)
+                SummaryView(name: controller.name, session: controller.session, onRepeat: controller.restart, onExit: onExit)
             } else {
                 LiveView(controller: controller)
             }
@@ -127,7 +127,7 @@ private struct LiveView: View {
                 Button("End Workout") { controller.perform { session, _ in session.endWorkout() } }
                 Button("Resume") { controller.perform { $0.resume($1) } }
             } else {
-                if session.configuration.countsRounds {
+                if session.plan.record == .rounds {
                     Button { controller.perform { session, _ in session.undoRound() } } label: {
                         Label("Undo last round", systemImage: "arrow.uturn.backward")
                     }
@@ -189,23 +189,24 @@ private struct Palette {
 }
 
 private struct SummaryView: View {
+    let name: String
     let session: Session
     let onRepeat: () -> Void
     let onExit: () -> Void
 
     private func format(_ duration: Duration) -> String {
-        SessionDisplay.format(duration, hundredths: session.configuration.showsHundredths)
+        TimeFormat.format(duration, hundredths: session.plan.showsHundredths)
     }
 
     var body: some View {
         VStack(spacing: 24) {
-            Text(session.configuration.name).font(.largeTitle.weight(.bold))
+            Text(name).font(.largeTitle.weight(.bold))
             Text(format(session.workoutTime(.now)))
                 .font(.system(size: 96, weight: .heavy, design: .rounded))
                 .monospacedDigit()
                 .accessibilityLabel("Workout time \(format(session.workoutTime(.now)))")
             VStack(spacing: 8) {
-                if session.configuration.countsRounds {
+                if session.plan.record == .rounds {
                     LabeledContent("Rounds", value: "\(session.roundsCounted)")
                 }
                 ForEach(Array(session.splits.enumerated()), id: \.offset) { index, split in

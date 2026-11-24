@@ -57,30 +57,30 @@ import Testing
     @Test func everyDefaultIsAPreset() {
         for configuration in WorkoutConfiguration.defaults {
             switch configuration {
-            case .timer(let duration):
-                #expect(SetupLimits.durationPresets.contains(duration))
-            case .amrap(let block, let blocks, let rest, _):
-                #expect(SetupLimits.durationPresets.contains(block))
-                #expect(SetupLimits.blockPresets.contains(blocks))
-                #expect(SetupLimits.longRestPresets.contains(rest))
-            case .emom(let window, let exercises, let rounds, let rest):
-                #expect(SetupLimits.windowPresets.contains(window))
-                #expect(SetupLimits.exercisePresets.contains(exercises))
-                #expect(SetupLimits.roundPresets.contains(rounds))
-                #expect(SetupLimits.longRestPresets.contains(rest))
-            case .tabata(let rounds):
-                #expect(SetupLimits.roundPresets.contains(rounds))
-            case .intervals(let work, let rest, let rounds):
-                #expect(SetupLimits.workPresets.contains(work))
-                #expect(SetupLimits.restPresets.contains(rest))
-                #expect(SetupLimits.roundPresets.contains(rounds))
+            case .countdown(let countdown):
+                #expect(SetupLimits.durationPresets.contains(countdown.duration))
+            case .amrap(let amrap):
+                #expect(SetupLimits.durationPresets.contains(amrap.block))
+                #expect(SetupLimits.blockPresets.contains(amrap.blocks))
+                #expect(SetupLimits.longRestPresets.contains(amrap.rest))
+            case .emom(let emom):
+                #expect(SetupLimits.windowPresets.contains(emom.window))
+                #expect(SetupLimits.exercisePresets.contains(emom.exercises))
+                #expect(SetupLimits.roundPresets.contains(emom.rounds))
+                #expect(SetupLimits.longRestPresets.contains(emom.rest))
+            case .tabata(let tabata):
+                #expect(SetupLimits.roundPresets.contains(tabata.rounds))
+            case .intervals(let intervals):
+                #expect(SetupLimits.workPresets.contains(intervals.work))
+                #expect(SetupLimits.restPresets.contains(intervals.rest))
+                #expect(SetupLimits.roundPresets.contains(intervals.rounds))
             case .forTime:
                 #expect(SetupLimits.capPresets.contains(SetupLimits.defaultCap))
             case .stopwatch:
                 break
-            case .sets(let rest, let sets):
-                #expect(SetupLimits.longRestPresets.contains(rest))
-                #expect(SetupLimits.setPresets.contains(sets))
+            case .sets(let sets):
+                #expect(SetupLimits.longRestPresets.contains(sets.rest))
+                #expect(SetupLimits.setPresets.contains(sets.sets))
             }
         }
     }

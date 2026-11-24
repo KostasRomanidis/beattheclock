@@ -13,15 +13,20 @@ final class SessionController {
     // the display, so views redraw only when something visible changes, not on every tick.
     @ObservationIgnored private(set) var session: Session
     private(set) var display: SessionDisplay
+    let name: String
+    private let plan: WorkoutPlan
     private let getReady: Duration
     private let cuePlayer: CuePlayer
     private let wake = DisplayWake()
 
     init(configuration: WorkoutConfiguration, getReady: Duration, cuePlayer: CuePlayer) {
         let now = ContinuousClock.now
-        let session = Session(configuration: configuration, getReady: getReady, startingAt: now)
+        let plan = configuration.plan()
+        let session = Session(plan: plan, getReady: getReady, startingAt: now)
         self.session = session
         self.display = SessionDisplay(session: session, now: now)
+        self.name = configuration.name
+        self.plan = plan
         self.getReady = getReady
         self.cuePlayer = cuePlayer
     }
@@ -50,7 +55,7 @@ final class SessionController {
 
     /// Starts the same workout again from its get-ready countdown.
     func restart() {
-        session = Session(configuration: session.configuration, getReady: getReady, startingAt: .now)
+        session = Session(plan: plan, getReady: getReady, startingAt: .now)
         tick()
     }
 

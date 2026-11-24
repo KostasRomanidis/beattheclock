@@ -1,8 +1,3 @@
-/// A sound the app should play, reported by `Session.update` at the moment it is due.
-public enum CueEvent: Equatable, Sendable {
-    case tick, workStart, restStart, finish
-}
-
 /// A running workout. It has no clock of its own: every operation takes the current time,
 /// so elapsed time is always measured from stored instants and never drifts.
 public struct Session: Sendable {
@@ -12,130 +7,87 @@ public struct Session: Sendable {
         case running, paused, finished
     }
 
-    public enum MainAction: Equatable, Sendable {
-        case countRound, split, setDone
-    }
-
-    static let finalSecondsTicks: [Duration] = [.seconds(3), .seconds(2), .seconds(1)]
-    static let staleCueLimit: Duration = .seconds(1)
-
-    public let configuration: WorkoutConfiguration
-    public let segments: [Segment]
-    /// The calculated total, worked out once. Nil when the athlete decides when a phase ends.
-    public let total: Duration?
-    /// The number of work segments before each index, so positions need no scan per tick.
-    let workBefore: [Int]
-    let workCount: Int
-    public private(set) var status: Status = .running
-    public private(set) var segmentIndex = 0
+    /// The plan being run, after get-ready if there is one.
+    public let plan: WorkoutPlan
+    private(set) var phaseIndex = 0
     public private(set) var roundsCounted = 0
     public private(set) var splits: [Duration] = []
 
-    private var segmentStart: Instant
-    private var workoutStart: Instant?
-    private var pausedAt: Instant?
-    private var endedAt: Instant?
-    private var cueCursor: Instant
-    private var pendingCues: [TimedCue] = []
-
-    private struct TimedCue: Sendable {
-        var moment: Instant
-        let cue: CueEvent
-    }
+    private var clock: SessionClock
+    private var cues = CueQueue()
+    // In session time, which excludes pauses.
+    private var phaseStart: Duration = .zero
+    private var workoutStart: Duration?
 
     /// Starts the workout at `now`, beginning with get-ready unless `getReady` is zero.
-    public init(configuration: WorkoutConfiguration, getReady: Duration, startingAt now: Instant) {
-        let getReadySegments = getReady > .zero ? [Segment(kind: .getReady, ending: .afterDuration(getReady))] : []
-        let segments = getReadySegments + configuration.timeline()
-        var workBefore: [Int] = []
-        var workCount = 0
-        for segment in segments {
-            workBefore.append(workCount)
-            if segment.kind == .work { workCount += 1 }
-        }
-        self.configuration = configuration
-        self.segments = segments
-        self.total = configuration.total
-        self.workBefore = workBefore
-        self.workCount = workCount
-        self.segmentStart = now
-        self.cueCursor = now
-        begin(0, at: now)
+    public init(plan: WorkoutPlan, getReady: Duration, startingAt now: Instant) {
+        self.plan = plan.starting(with: getReady)
+        self.clock = SessionClock(startingAt: now)
+        begin(0, at: .zero)
     }
 
-    public var currentSegment: Segment { segments[segmentIndex] }
+    public var status: Status {
+        switch clock.state {
+        case .running: .running
+        case .paused: .paused
+        case .ended: .finished
+        }
+    }
 
-    public var isInGetReady: Bool { currentSegment.kind == .getReady }
+    public var currentPhase: Phase { plan.phases[phaseIndex] }
+
+    public var isInGetReady: Bool { currentPhase.kind == .getReady }
 
     /// The action a tap or Return performs right now, if the phase has one.
-    public var availableAction: MainAction? {
-        guard status == .running, currentSegment.kind == .work else { return nil }
-        switch configuration {
-        case .amrap(_, _, _, let countsRounds): return countsRounds ? .countRound : nil
-        case .forTime: return .split
-        case .sets: return .setDone
-        case .timer, .emom, .tabata, .intervals, .stopwatch: return nil
-        }
+    public var availableAction: Phase.MainAction? {
+        status == .running ? currentPhase.mainAction : nil
     }
 
     /// Whether Finish can end the workout now: For Time and Stopwatch, once past get-ready.
     public var canFinish: Bool {
-        guard status == .running, currentSegment.kind == .work else { return false }
-        switch configuration {
-        case .forTime, .stopwatch: return true
-        case .timer, .amrap, .emom, .tabata, .intervals, .sets: return false
-        }
+        status == .running && currentPhase.canFinish
     }
 
     // MARK: Time
 
-    public func elapsedInSegment(_ now: Instant) -> Duration {
-        frozen(now) - segmentStart
+    public func elapsedInPhase(_ now: Instant) -> Duration {
+        clock.time(now) - phaseStart
     }
 
     /// Time left in the current phase, or nil for a phase that counts up.
-    public func timeLeftInSegment(_ now: Instant) -> Duration? {
-        currentSegment.countdownDuration.map { $0 - elapsedInSegment(now) }
+    public func timeLeftInPhase(_ now: Instant) -> Duration? {
+        currentPhase.countdownDuration.map { $0 - elapsedInPhase(now) }
     }
 
     /// Workout time so far, excluding get-ready and pauses.
     public func workoutTime(_ now: Instant) -> Duration {
         guard let workoutStart else { return .zero }
-        return frozen(now) - workoutStart
+        return clock.time(now) - workoutStart
     }
 
     /// Advances through every phase boundary passed by `now` and returns the cues due since
     /// the previous update, dropping any more than a second late.
     public mutating func update(_ now: Instant) -> [CueEvent] {
         guard status != .paused else { return [] }
-        if status == .running { advance(to: now) }
-        let due = pendingCues.filter { now - $0.moment <= Self.staleCueLimit }.map(\.cue)
-        pendingCues = []
-        cueCursor = now
-        return due
+        advance(to: now)
+        return cues.takeDue(clock.timeIfRunning(now))
     }
 
     // MARK: Controls
+    // Each advances first, so it acts on the phase at `now` and not the one at the last update.
 
     public mutating func pause(_ now: Instant) {
-        guard status == .running else { return }
-        pausedAt = now
-        status = .paused
+        advance(to: now)
+        clock.pause(now)
     }
 
     public mutating func resume(_ now: Instant) {
-        guard status == .paused, let pausedAt else { return }
-        let pause = now - pausedAt
-        segmentStart += pause
-        workoutStart? += pause
-        cueCursor += pause
-        for index in pendingCues.indices { pendingCues[index].moment += pause }
-        self.pausedAt = nil
-        status = .running
+        clock.resume(now)
     }
 
     /// Space bar: skips get-ready, otherwise pauses or resumes.
     public mutating func togglePause(_ now: Instant) {
+        advance(to: now)
         switch status {
         case .running where isInGetReady: skipGetReady(now)
         case .running: pause(now)
@@ -155,6 +107,7 @@ public struct Session: Sendable {
 
     /// Tap or click: the phase's main action if it has one, otherwise the same as the space bar.
     public mutating func tap(_ now: Instant) {
+        advance(to: now)
         if availableAction != nil {
             mainAction(now)
         } else {
@@ -163,15 +116,17 @@ public struct Session: Sendable {
     }
 
     public mutating func skipGetReady(_ now: Instant) {
+        advance(to: now)
         guard status == .running, isInGetReady else { return }
-        beginNext(at: now)
+        beginNext(at: clock.time(now))
     }
 
     public mutating func mainAction(_ now: Instant) {
+        advance(to: now)
         switch availableAction {
         case .countRound: roundsCounted += 1
         case .split: splits.append(workoutTime(now) - splits.reduce(.zero, +))
-        case .setDone: beginNext(at: now)
+        case .setDone: beginNext(at: clock.time(now))
         case nil: break
         }
     }
@@ -182,85 +137,57 @@ public struct Session: Sendable {
     }
 
     public mutating func finish(_ now: Instant) {
+        advance(to: now)
         guard canFinish else { return }
-        end(at: now)
+        end(at: clock.time(now))
     }
 
     /// End Workout from the paused state, keeping the workout time reached when paused.
     public mutating func endWorkout() {
-        guard status == .paused, let pausedAt else { return }
-        endedAt = pausedAt
-        status = .finished
+        guard case .paused(let time) = clock.state else { return }
+        clock.end(at: time)
+        cues.cancelAll()
     }
 
     // MARK: Private
 
-    /// The time to measure against: stopped while paused or after the end.
-    private func frozen(_ now: Instant) -> Instant {
-        endedAt ?? pausedAt ?? now
-    }
-
     private mutating func advance(to now: Instant) {
         while status == .running {
-            if let countdown = currentSegment.countdownDuration {
-                queueTicks(endingAt: segmentStart + countdown, upTo: now)
-            }
-            guard let limit = currentSegment.limit, now - segmentStart >= limit else { return }
+            guard let limit = currentPhase.limit, clock.time(now) - phaseStart >= limit else { return }
             // The next phase starts when this one should have ended, so a late update loses no time.
-            beginNext(at: segmentStart + limit)
+            beginNext(at: phaseStart + limit)
         }
     }
 
-    private mutating func queueTicks(endingAt end: Instant, upTo now: Instant) {
-        for secondsLeft in Self.finalSecondsTicks {
-            let moment = end - secondsLeft
-            if moment > segmentStart && moment > cueCursor && moment <= now {
-                pendingCues.append(TimedCue(moment: moment, cue: .tick))
-            }
-        }
-    }
-
-    private mutating func beginNext(at moment: Instant) {
-        if segmentIndex + 1 < segments.count {
-            begin(segmentIndex + 1, at: moment)
+    private mutating func beginNext(at moment: Duration) {
+        cues.cancel(after: moment)
+        if phaseIndex + 1 < plan.phases.count {
+            begin(phaseIndex + 1, at: moment)
         } else {
             end(at: moment)
         }
     }
 
-    private mutating func begin(_ index: Int, at moment: Instant) {
-        segmentIndex = index
-        segmentStart = moment
-        switch currentSegment.kind {
+    private mutating func begin(_ index: Int, at moment: Duration) {
+        phaseIndex = index
+        phaseStart = moment
+        switch currentPhase.kind {
         case .getReady:
             break
         case .work:
             if workoutStart == nil { workoutStart = moment }
-            pendingCues.append(TimedCue(moment: moment, cue: .workStart))
+            cues.queue(.workStart, at: moment)
         case .rest:
-            pendingCues.append(TimedCue(moment: moment, cue: .restStart))
+            cues.queue(.restStart, at: moment)
+        }
+        if let countdown = currentPhase.countdownDuration {
+            cues.queueTicks(from: moment, to: moment + countdown)
         }
     }
 
-    private mutating func end(at moment: Instant) {
-        endedAt = moment
-        status = .finished
-        pendingCues.append(TimedCue(moment: moment, cue: .finish))
-    }
-}
-
-extension Segment {
-    /// How long a timed phase runs, or nil when it counts up.
-    var countdownDuration: Duration? {
-        guard case .afterDuration(let duration) = ending else { return nil }
-        return duration
-    }
-
-    /// When the phase ends on its own: its duration, or the cap of a count-up phase.
-    var limit: Duration? {
-        switch ending {
-        case .afterDuration(let duration): duration
-        case .byUser(let cap): cap
-        }
+    private mutating func end(at moment: Duration) {
+        clock.end(at: moment)
+        cues.cancel(after: moment)
+        cues.queue(.finish, at: moment)
     }
 }
